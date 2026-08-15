@@ -1,25 +1,21 @@
-import { CalculateMetadataFunction, Composition } from "remotion";
-
-type Props = {};
-
-const calculateMetadata: CalculateMetadataFunction<Props> = () => {
-  return {};
-};
+import { Composition } from "remotion";
+import { TextMotion, TextMotionProps } from "./TextMotion";
 
 export const MyComposition = () => {
   return (
     <Composition
-      id="MyComp"
-      component={MyComponent}
-      durationInFrames={60}
+      id="TextMotion"
+      component={TextMotion}
+      durationInFrames={120}
       fps={30}
-      width={1280}
-      height={720}
-      calculateMetadata={calculateMetadata}
+      width={1920}
+      height={1080}
+      defaultProps={
+        {
+          title: "Motion in Four Seconds",
+          subtitle: "Built with Remotion",
+        } satisfies TextMotionProps
+      }
     />
   );
-};
-
-export const MyComponent: React.FC<Props> = () => {
-  return null;
 };
