@@ -141,6 +141,41 @@ npx remotion render WelcomeScreen out/welcome.mp4 \
   --browser-executable="C:\Program Files\Google\Chrome\Application\chrome.exe"
 ```
 
+### SkoolConnectFilm — 1920x1080, 1800 frames (60s)
+
+A brand film for [SkoolConnectNG](https://skoolconnect.ng), built to their published
+identity. Colours, typography and the logo come from the product itself; every line of
+copy is taken from their brand guidelines and concept note.
+
+| Scene | Frames | Beat |
+|---|---|---|
+| Open | 258 | Network draws itself into a graph around the mark; wordmark; positioning line |
+| Problem | 438 | Three failure cards that drift apart as the scene runs |
+| Solution | 378 | Spokes wire four user groups into one hub |
+| Difference | 378 | Contrast rows; the old way struck through in destructive red |
+| Pillars | 258 | Verified / Offline-First / Secure by Default |
+| Close | 180 | Mark, "The time is now.", skoolconnect.ng |
+
+Scenes live in `src/skng/`. They overlap by 18 frames so each fade-out cross-dissolves
+into the next fade-in, which is why the scene durations sum to 1890 rather than 1800.
+
+**Brand sources**
+
+| Token | Value | Source |
+|---|---|---|
+| Primary / Secondary / Accent | `#165538` / `#208251` / `#1b7247` | Brand guidelines, `app/globals.css` |
+| Text / Surface | `#1a373f` / `#e4f4f1` | same |
+| Destructive | `#e31e24` | used only for failure states |
+| Headings | Montserrat 900, tracking -0.025em | `app/layout.tsx` implements `--font-modica` as Montserrat |
+
+Montserrat is **self-hosted** at `src/skng/montserrat-latin.woff2` and declared in
+`src/skng/fonts.css`. Do not swap this for a runtime font fetch: a stalled network
+request blocks every frame of the render.
+
+> **Never call `delayRender()` for a font here.** Remotion fakes timers during
+> rendering, so a `setTimeout` safety net will never fire and the render hangs until it
+> times out. Bundled `@font-face` with `font-display: block` needs no `delayRender`.
+
 ## Adding a composition — the working recipe
 
 Every piece in this repo was built and confirmed with the same five steps. Follow them
@@ -196,12 +231,23 @@ it and a finished frame does not.
 | Live preview | `localhost:3000` via `npm run dev` |
 | Extracted frames | wherever you point `-y` |
 
+**Encode step fails but frames render fine?** Render an image sequence and encode
+separately — this splits the long frame pass from the short encode:
+
+```bash
+npx remotion render <Id> out/frames --sequence --image-format=jpeg --jpeg-quality=94
+ffmpeg -framerate 30 -i out/frames/element-%04d.jpeg \
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart \
+  out/<name>.mp4
+```
+
 ## Status
 
 Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
+| `SkoolConnectFilm` | `out/skoolconnect-60s.mp4` | h264 1920x1080 30fps, 1800 frames, 59.93s, 7.9 MB |
 | `WelcomeScreen` | `out/welcome.mp4` | h264 1920x1080 30fps, 150 frames, 5.056s, 1.2 MB |
 | `LowerThird` | `out/lower-third.mp4` | h264 1920x1080 30fps, 90 frames, 197 kB |
 

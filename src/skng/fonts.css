@@ -1,0 +1,14 @@
+/**
+ * Montserrat, self-hosted. The product implements its `--font-modica` heading
+ * face as Montserrat (see app/layout.tsx), so the film matches what ships.
+ *
+ * The file is bundled rather than fetched from Google at render time: a stalled
+ * network request would block every frame of the render.
+ */
+@font-face {
+  font-family: "MontserratLocal";
+  src: url("./montserrat-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
