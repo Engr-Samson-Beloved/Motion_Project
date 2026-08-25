@@ -9,11 +9,11 @@ A video here is not a timeline file. It is a React component that is re-rendered
 per frame. The only input that changes between frames is the frame number:
 
 ```tsx
-const frame = useCurrentFrame();   // 0, 1, 2, ... 119
+const frame = useCurrentFrame();   // 0, 1, 2, ... 149
 ```
 
 Your job is to answer one question: **given frame N, what does the picture look like?**
-Remotion calls your component 120 times, screenshots each result, and encodes the
+Remotion calls your component once per frame, screenshots each result, and encodes the
 sequence into a video. Animation is therefore just math — mapping a frame number onto a
 position, an opacity, a scale.
 
@@ -31,38 +31,44 @@ should feel like it has mass — entrances, pops, slides.
 
 ```
 src/
-  index.ts          Entry point. Hands Root.tsx to Remotion. Never needs editing.
-  Root.tsx          Lists every composition in the project.
-  Composition.tsx   Registers "TextMotion": its size, fps, length, default text.
-  TextMotion.tsx    The actual animation. This is where design work happens.
-  index.css         Tailwind entry.
-remotion.config.ts  Bundler + render settings.
+  index.ts           Entry point. Hands Root.tsx to Remotion. Never needs editing.
+  Root.tsx           Registers every composition: size, fps, duration, default props.
+  WelcomeScreen.tsx  5s welcome title card.
+  TextMotion.tsx     4s text reveal.
+  index.css          Tailwind entry.
+remotion.config.ts   Bundler + render settings.
 ```
 
-The split between `Composition.tsx` and `TextMotion.tsx` matters:
+`Root.tsx` is the spec sheet — change a video's dimensions or length there. The
+component files are the artwork — change how things look and move there.
 
-- **`Composition.tsx` is the spec sheet** — dimensions, frame rate, duration, and the
-  default props. Change the video's length or size here.
-- **`TextMotion.tsx` is the artwork** — what actually gets drawn and how it moves.
-  Change the look here.
+## Compositions
 
-## What is built
-
-One composition, `TextMotion` — 1920x1080, 30fps, 120 frames (4 seconds).
+### WelcomeScreen — 1920x1080, 150 frames (5s)
 
 | Frames | Beat |
 |---|---|
-| 0–32 | Title words spring in, staggered 4 frames apart; each rises 90px as opacity and a 12px blur resolve |
-| 22–52 | Gradient rule wipes outward horizontally (`scaleX` 0 → 1) |
-| 34–62 | Subtitle rises 24px and fades in |
-| 0–120 | Slow push-in across the whole scene, 1.0 → 1.06 |
-| 106–120 | Everything fades out together |
+| 0–30 | Background blooms in: two drifting radial pools, blue and violet, over near-black |
+| 6–51 | Circular badge springs in with slight overshoot, showing the brand initial |
+| 6–150 | Conic-gradient ring rotates continuously behind the badge |
+| 26–~80 | Title reveals letter by letter, 3-frame stagger, each rising 80px through a blur |
+| 66–102 | Gradient rule wipes out; tagline rises and fades in |
+| 82–112 | Brand lockup fades in, letterspaced caps |
+| 134–150 | Everything fades out together |
 
-The stagger is what makes it read as designed rather than as a single block moving:
-each word's spring is offset by `i * WORD_STAGGER` frames, so they arrive in sequence.
+Props: `title`, `tagline`, `brand`.
 
-Text is prop-driven (`title`, `subtitle`), so the wording can be changed in the Studio
-without touching code.
+### TextMotion — 1920x1080, 120 frames (4s)
+
+| Frames | Beat |
+|---|---|
+| 0–32 | Title words spring in, staggered 4 frames apart, rising 90px through a blur |
+| 22–52 | Gradient rule wipes out horizontally |
+| 34–62 | Subtitle rises and fades in |
+| 0–120 | Slow 1.0 → 1.06 push-in across the whole scene |
+| 106–120 | Shared exit fade |
+
+Props: `title`, `subtitle`.
 
 ## How to use it
 
@@ -72,21 +78,18 @@ without touching code.
 npm run dev
 ```
 
-Opens Remotion Studio at `localhost:3000`. This is the main workspace:
-
-- **Scrub the timeline** to inspect any frame. Motion problems are almost always
-  visible in a single frame held still.
-- **Edit props in the right-hand panel** to retype the title and subtitle live.
-- **Save a file and the preview hot-reloads** — the normal React feedback loop.
+Opens Remotion Studio at `localhost:3000`. Scrub the timeline to inspect any frame,
+edit props live in the right-hand panel, and save a file to hot-reload the preview.
 
 ### Render to a file
 
 ```bash
+npx remotion render WelcomeScreen out/welcome.mp4
 npx remotion render TextMotion out/text.mp4
 ```
 
-`out/` is gitignored. Add `--props='{"title":"...","subtitle":"..."}'` to render a
-variant without editing code.
+`out/` is gitignored. Add `--props='{"title":"..."}'` to render a variant without
+editing code.
 
 ### Before committing
 
@@ -96,34 +99,39 @@ npm run lint     # eslint + tsc
 
 ## Tuning guide
 
-Change duration in `Composition.tsx` (`durationInFrames`); the exit fade is derived from
-it, so shortening the video keeps the fade at the tail automatically.
+Duration lives in `Root.tsx` (`durationInFrames`). Exit fades are derived from it, so
+shortening a composition keeps its fade at the tail automatically.
 
-In `TextMotion.tsx`, the timing constants sit at the top of the file:
+Timing constants sit at the top of each component file:
 
 ```
-WORD_STAGGER   gap between word entrances — raise for a lazier reveal
-RULE_START     frame the accent line begins its wipe
-SUBTITLE_START frame the subtitle begins
-EXIT_LENGTH    frames reserved for the closing fade
+LETTER_STAGGER / WORD_STAGGER   gap between entrances — raise for a lazier reveal
+RULE_START, TAGLINE_START, ...  frame each beat begins
+EXIT_LENGTH                     frames reserved for the closing fade
 ```
 
-Feel is controlled by `spring`'s `damping`. It is currently `200` throughout, which
-settles with no overshoot. Lower it (~12) for a springy bounce.
+Feel is controlled by `spring`'s `damping`. `200` settles with no overshoot; the badge
+uses `13` for a deliberate bounce. Lower means springier.
+
+## Troubleshooting
+
+**Headless Shell download stalls.** Remotion downloads a 113 MB Chrome Headless Shell on
+first render. If the download times out repeatedly, point it at an installed Chrome
+instead:
+
+```bash
+npx remotion render WelcomeScreen out/welcome.mp4 \
+  --browser-executable="C:\Program Files\Google\Chrome\Application\chrome.exe"
+```
 
 ## Status
 
-Verified: dependency install, eslint, `tsc`, and rspack bundling.
-
-Not yet verified: the animation has never been viewed or rendered. Chrome-launching
-operations (`remotion render`, `remotion still`, `remotion compositions`) hang in the
-authoring agent's environment. Running `npm run dev` locally is the outstanding step —
-it will confirm both that the piece looks right and whether the hang is environment
-specific.
+Verified end to end: install, eslint, `tsc`, bundling, and a full render.
+`out/welcome.mp4` renders as h264 1920x1080, 30fps, 150 frames, 5.056s.
 
 ## Goal
 
-Reach a repeatable pipeline for short motion graphics: a library of composable animated
-pieces driven by props, previewed in Studio and rendered to MP4. `TextMotion` is the
-first piece and the reference pattern — a typed props contract, timing constants
+A repeatable pipeline for short motion graphics: a library of composable, prop-driven
+animated pieces, previewed in Studio and rendered to MP4. `WelcomeScreen` and
+`TextMotion` are the reference pattern — a typed props contract, timing constants
 declared at the top, and springs doing the motion.
