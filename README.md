@@ -176,6 +176,36 @@ request blocks every frame of the render.
 > rendering, so a `setTimeout` safety net will never fire and the render hangs until it
 > times out. Bundled `@font-face` with `font-display: block` needs no `delayRender`.
 
+### SkoolConnectReel — 1080x1920, 1800 frames (60s)
+
+The vertical social cut for Instagram/TikTok. Where the 16:9 film sells the *idea*,
+the reel explains the *product*: what SkoolConnectNG actually does, screen by screen.
+
+Thirteen scenes on a ~4-second cadence with **hard cuts and no overlap** — a feed
+format needs pace, not cross-dissolves. Springs here run at low damping so entrances
+overshoot and land, which is what makes a cut read as a hit.
+
+| # | Scene | Frames |
+|---|---|---|
+| 1 | Hook — group-chat noise, "Your academic life is scattered." | 120 |
+| 2 | Problem — three red-dotted failures slam in | 130 |
+| 3 | Logo slam | 110 |
+| 4 | Promise — "One verified network for Nigerian students." | 120 |
+| 5 | Verified profile — ticks pop on school, department, matric | 150 |
+| 6 | School explorer — search and institution list | 150 |
+| 7 | Scoped messaging — department chat arriving live | 150 |
+| 8 | Resources — past questions and notes | 150 |
+| 9 | Mentorship — role progression to alumni and mentor | 150 |
+| 10 | Offline-first — signal bars, "Works on a bad network." | 130 |
+| 11 | Audience — Students / Aspirants / Institutions / Alumni | 140 |
+| 12 | Scale — "Tens of millions of students. One network." | 130 |
+| 13 | CTA — mark, "The time is now.", skoolconnect.ng | 170 |
+
+Feature scenes render mock UI inside a `Phone` shell that includes a bottom tab bar.
+The tab bar is not decoration: without it the mock screens float in empty space and
+read as unfinished. The lit tab also tells the viewer which part of the app they are
+looking at.
+
 ## Adding a composition — the working recipe
 
 Every piece in this repo was built and confirmed with the same five steps. Follow them
@@ -247,6 +277,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
+| `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |
 | `SkoolConnectFilm` | `out/skoolconnect-60s.mp4` | h264 1920x1080 30fps, 1800 frames, 59.93s, 7.9 MB |
 | `WelcomeScreen` | `out/welcome.mp4` | h264 1920x1080 30fps, 150 frames, 5.056s, 1.2 MB |
 | `LowerThird` | `out/lower-third.mp4` | h264 1920x1080 30fps, 90 frames, 197 kB |

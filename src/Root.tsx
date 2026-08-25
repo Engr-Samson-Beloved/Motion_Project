@@ -1,6 +1,7 @@
 import "./index.css";
 import { Composition } from "remotion";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
+import { SkoolConnectReel } from "./skng/reel/SkoolConnectReel";
 import { LowerThird, LowerThirdProps } from "./LowerThird";
 import { TextMotion, TextMotionProps } from "./TextMotion";
 import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
@@ -8,6 +9,15 @@ import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Composition
+        id="SkoolConnectReel"
+        component={SkoolConnectReel}
+        durationInFrames={1800}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
       <Composition
         id="SkoolConnectFilm"
         component={SkoolConnectFilm}
