@@ -70,6 +70,23 @@ Props: `title`, `tagline`, `brand`.
 
 Props: `title`, `subtitle`.
 
+### LowerThird — 1920x1080, 90 frames (3s)
+
+A broadcast-style name/role tag anchored bottom-left, designed to sit over footage.
+
+| Frames | Beat |
+|---|---|
+| 0–24 | Accent bar grows upward from the baseline (`scaleY`, origin bottom) |
+| 4–34 | Panel expands rightward from the bar (`scaleX`, origin left) |
+| 12–44 | Name wipes in left-to-right behind a hard `clip-path` edge |
+| 24–54 | Role wipes in the same way, delayed |
+| 70–90 | Lockup slides 70px left and fades out |
+
+Props: `name`, `role`.
+
+The type counter-scales against the panel's `scaleX` so the panel can expand without
+stretching the letterforms — the reveal is a clip, not a squash.
+
 ## How to use it
 
 ### Design loop
@@ -124,10 +141,69 @@ npx remotion render WelcomeScreen out/welcome.mp4 \
   --browser-executable="C:\Program Files\Google\Chrome\Application\chrome.exe"
 ```
 
+## Adding a composition — the working recipe
+
+Every piece in this repo was built and confirmed with the same five steps. Follow them
+in order; each one fails loudly, so you always know which stage broke.
+
+**1. Write the component.** Copy an existing file as the pattern: typed props exported
+alongside the component, timing constants named and grouped at the top, springs for
+entrances and `interpolate` for fades.
+
+**2. Register it in `Root.tsx`.** Give it an `id`, dimensions, `fps`,
+`durationInFrames`, and `defaultProps` typed with `satisfies`.
+
+**3. Typecheck before rendering.** Rendering is slow; typechecking is seconds.
+
+```bash
+npm run lint
+```
+
+**4. Render it.**
+
+```bash
+npx remotion render <Id> out/<name>.mp4 \
+  --browser-executable="C:\Program Files\Google\Chrome\Application\chrome.exe"
+```
+
+Success looks like `Rendered 90/90`, then `Encoded 90/90`, then a size line. Exit code 0.
+
+**5. Verify the file rather than trusting the exit code.** Confirm the container really
+holds what you intended:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffprobe.exe -v error \
+  -show_entries stream=codec_name,width,height,r_frame_rate,nb_frames \
+  -of default=noprint_wrappers=1 out/<name>.mp4
+```
+
+Then look at actual frames — pick timestamps that land mid-animation, where mistakes
+show, not just the final held pose:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -v error \
+  -ss 0.95 -i out/<name>.mp4 -frames:v 1 -vf scale=760:-1 -y frame.png
+```
+
+A mid-wipe frame is the useful one: if a reveal is broken, a half-revealed frame shows
+it and a finished frame does not.
+
+## Where output goes
+
+| What | Where |
+|---|---|
+| Rendered video | `C:\Remotion\out\` (gitignored) |
+| Live preview | `localhost:3000` via `npm run dev` |
+| Extracted frames | wherever you point `-y` |
+
 ## Status
 
-Verified end to end: install, eslint, `tsc`, bundling, and a full render.
-`out/welcome.mp4` renders as h264 1920x1080, 30fps, 150 frames, 5.056s.
+Verified end to end: install, eslint, `tsc`, bundling, and full renders.
+
+| Composition | Output | Result |
+|---|---|---|
+| `WelcomeScreen` | `out/welcome.mp4` | h264 1920x1080 30fps, 150 frames, 5.056s, 1.2 MB |
+| `LowerThird` | `out/lower-third.mp4` | h264 1920x1080 30fps, 90 frames, 197 kB |
 
 ## Goal
 

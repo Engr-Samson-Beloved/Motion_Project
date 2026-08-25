@@ -1,5 +1,6 @@
 import "./index.css";
 import { Composition } from "remotion";
+import { LowerThird, LowerThirdProps } from "./LowerThird";
 import { TextMotion, TextMotionProps } from "./TextMotion";
 import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 
@@ -19,6 +20,21 @@ export const RemotionRoot: React.FC = () => {
             tagline: "Let's design some motion graphics",
             brand: "Motion Project",
           } satisfies WelcomeScreenProps
+        }
+      />
+
+      <Composition
+        id="LowerThird"
+        component={LowerThird}
+        durationInFrames={90}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={
+          {
+            name: "Samson Beloved",
+            role: "Motion Design",
+          } satisfies LowerThirdProps
         }
       />
 
