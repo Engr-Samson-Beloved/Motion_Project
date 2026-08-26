@@ -35,7 +35,16 @@ src/
   Root.tsx           Registers every composition: size, fps, duration, default props.
   WelcomeScreen.tsx  5s welcome title card.
   TextMotion.tsx     4s text reveal.
+  LowerThird.tsx     3s broadcast name tag.
+  CinemaProbe.tsx    A/B rig for the cinema toolkit. Not a deliverable.
   index.css          Tailwind entry.
+  lib/cinema/        Brand-agnostic film-look toolkit (see below).
+  skng/              SkoolConnectNG brand system, scenes and films.
+    reel/            Vertical 9:16 cut.
+    three/           3D scenes.
+public/
+  skng-logo.png      The mark.
+  bed.mp3            60s music bed at 100 BPM. Beat = 18 frames at 30fps.
 remotion.config.ts   Bundler + render settings.
 ```
 
@@ -132,6 +141,29 @@ uses `13` for a deliberate bounce. Lower means springier.
 
 ## Troubleshooting
 
+**Everything hangs, including trivial commands.** This machine has an active Windows
+file infector. It replaces an executable with a **533,504-byte** stub (SHA-256
+`AA1DD5B1…`) and preserves the original alongside it as `g<name>.exe`, plus a 0-byte
+`g<name>.ico`. Infected binaries hang instead of running.
+
+```powershell
+# find them
+Get-ChildItem node_modules -Recurse -Filter *.exe | Where-Object { $_.Length -eq 533504 }
+
+# restore one
+Remove-Item $dir\esbuild.exe; Move-Item $dir\gesbuild.exe $dir\esbuild.exe
+Remove-Item $dir\gesbuild.ico
+```
+
+`esbuild.exe` is the one that bites: Remotion loads `remotion.config.ts` through esbuild
+on **every** command, so an infected esbuild hangs the CLI before anything starts.
+`npm install` is when re-infection happens — check before and after every install.
+
+`C:\Program Files\Git\bin\bash.exe` is also infected, so anything routed through Git Bash
+hangs. Use PowerShell. The real fix is a **Microsoft Defender Offline Scan** (Windows
+Security → Virus & threat protection → Scan options); Defender's real-time protection
+does not detect this one.
+
 **Headless Shell download stalls.** Remotion downloads a 113 MB Chrome Headless Shell on
 first render. If the download times out repeatedly, point it at an installed Chrome
 instead:
@@ -206,6 +238,108 @@ The tab bar is not decoration: without it the mock screens float in empty space 
 read as unfinished. The lit tab also tells the viewer which part of the app they are
 looking at.
 
+## Cinematic toolkit — `src/lib/cinema/`
+
+Everything above animates cleanly. What separated it from footage was the layer that
+sits *on top of* the animation: blur, grade, camera, sound. That layer lives here, and
+it knows nothing about SkoolConnectNG, so it is reusable on the next project.
+
+| Module | Exports | What it is for |
+|---|---|---|
+| `grade.tsx` | `<FilmGrade>` | Grain, bloom, vignette, chromatic aberration. One SVG filter chain and one CSS overlay — **no dependencies**. |
+| `camera.tsx` | `<HandheldCamera>`, `<PushIn>`, `<Parallax>` | Puts the frame in someone's hands. Drift is sampled from `noise2D`, so it is organic but identical on every render. |
+| `blur.tsx` | `<Slam>`, `<Whip>` | Motion blur. `Slam` trails one moving element; `Whip` blurs the whole frame. |
+| `type.tsx` | `<FitHeading>`, `useFittedFontSize` | Type that measures itself and shrinks to fit rather than overrunning the frame. |
+| `audio.tsx` | `<Track>`, `beatPulse`, `beatGrid`, `useLevel` | The music bed and the beat grid to cut against. |
+
+### Why each one earns its place
+
+**Motion blur is the big one.** The reel's entrances run at spring damping 10–14, so they
+cross a lot of distance in very few frames. Rendered crisply that reads as *strobing*,
+not speed — the eye receives a row of sharp stills. `<Slam>` is what turns a fast cut
+into a hit.
+
+> Both blur components re-render their children several times per frame. Wrap the
+> smallest subtree that actually moves; wrapping a whole scene multiplies its render cost
+> by the sample count for nothing.
+
+**A locked-off frame is the strongest tell that a piece was coded rather than shot.**
+`<HandheldCamera>` scales up very slightly before it drifts, so the frame can never
+expose its own edges — rotation eats more margin than translation, which is why the
+safety margin accounts for `sway` as well as `travel`.
+
+**Grain, bloom and vignette are nearly free.** No library, one filter chain. The grain
+seed strides through the seed space (`frame * 7919`) rather than using the raw frame
+number, because consecutive `feTurbulence` seeds produce visibly similar noise fields and
+the grain would appear to crawl instead of shimmer.
+
+### The beat grid
+
+The bed is 100 BPM, which at 30fps makes a beat **exactly 18 frames**. Nothing has to
+round, and a cut on a multiple of 18 is genuinely on the beat rather than nearly on it.
+
+```tsx
+const pulse = beatPulse(frame, fps);       // 1 on the beat, decaying to 0
+transform: `scale(${1 + pulse * 0.06})`    // an element that breathes with the track
+```
+
+`public/bed.mp3` is synthesized, not licensed — regenerate or replace it freely.
+Remotion's bundled ffmpeg is a stripped build with no `aevalsrc` filter, so the synthesis
+happens in Node and ffmpeg only does the WAV to MP3 encode.
+
+> Current reel scene durations (120/130/110/120/150…) are **not** multiples of 18. Beat-
+> syncing that piece means re-timing its cuts, not just adding the audio.
+
+### Transitions
+
+`@remotion/transitions` ships considerably more than the docs index suggests —
+`fade`, `slide`, `wipe`, `flip`, `clock-wipe`, `book-flip`, `zoom-blur`, `dreamy-zoom`,
+`film-burn`, `linear-blur`, `zoom-in-out`, `iris`, `dissolve`, `ripple`, `crosswarp`,
+`cross-zoom`, `swap`, `push-cut`, `none`.
+
+The shader-backed ones (`zoom-blur`, `film-burn`, `dreamy-zoom`, `linear-blur`, the warps)
+draw through WebGL, so they need the same ANGLE renderer as three.js. Their props are all
+optional but the **argument is not** — `zoomBlur()` is a type error, `zoomBlur({})` is not.
+
+`TransitionSeries` also removes the offset arithmetic that `Series` needs for
+cross-dissolves: durations sum to the real total minus the transition lengths, instead of
+the `-OVERLAP` bookkeeping in `SkoolConnectFilm.tsx`.
+
+### 3D — `src/skng/three/LogoSlam3D.tsx`
+
+The mark rebuilt as a lit sculpture with a real `Bloom` pass via
+`@react-three/postprocessing`.
+
+Two things to know before editing it:
+
+1. **`Config.setChromiumOpenGlRenderer("angle")` is required.** Without it a
+   `<ThreeCanvas>` renders as an *empty frame* rather than throwing — a failure that
+   sails straight past a green exit code. The Node render APIs ignore
+   `remotion.config.ts`, so they need `chromiumOptions: {gl: "angle"}` passed directly.
+2. **Nothing in that file loads a texture.** `useLoader` suspends, and a suspended
+   subtree during a render pass also produces blank frames rather than an error. The
+   geometry is built from numbers and the logo PNG is composited over the top as a flat
+   `<Img>`, which needs no async anything.
+
+### CinemaProbe — 1080x1920, 300 frames (10s)
+
+The A/B rig. Each beat renders the same content twice, treated and untreated, split down
+the centre line.
+
+| Frames | Left | Right |
+|---|---|---|
+| 0–80 | raw | `<FilmGrade>` — grain, bloom, vignette, aberration |
+| 80–160 | locked off | `<HandheldCamera>` + two `<Parallax>` layers |
+| 160–240 | crisp slam | `<Slam>` motion blur |
+| 240–300 | three.js sculpture with bloom, full frame | |
+
+A beat meter runs along the bottom: the tick row pulses from the frame number, the bars
+above it come from the audio. If those two disagree, the bed and the grid have drifted
+and nothing cut against them will land.
+
+This is a test rig, not a deliverable. It exists so the toolkit can be judged against
+what it replaced before either film is touched.
+
 ## Adding a composition — the working recipe
 
 Every piece in this repo was built and confirmed with the same five steps. Follow them
@@ -266,10 +400,24 @@ separately — this splits the long frame pass from the short encode:
 
 ```bash
 npx remotion render <Id> out/frames --sequence --image-format=jpeg --jpeg-quality=94
-ffmpeg -framerate 30 -i out/frames/element-%04d.jpeg \
-  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -movflags +faststart \
-  out/<name>.mp4
+ffmpeg -framerate 30 -i out/frames/element-%03d.jpeg -i public/bed.mp3 \
+  -map 0:v -map 1:a -t <seconds> \
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \
+  -c:a aac -b:a 192k -movflags +faststart out/<name>.mp4
 ```
+
+An image sequence carries no audio, so the bed is muxed in at this step rather than
+coming from `<Track>`. That also means the tail fade `<Track>` applies is lost — add it
+in ffmpeg, or accept a hard out on a test render.
+
+> Remotion's bundled ffmpeg is a **stripped build**. It has `libmp3lame`, `aac` and
+> `libx264`, but no `aevalsrc`, no `alimiter` and no `afade`. Check with
+> `ffmpeg -filters` before reaching for one rather than debugging the escaping.
+
+**Render crashes partway with `target-closed` / "The browser crashed while rendering
+frame N".** Memory, not code. At 1080x1920 with several full-frame composited layers,
+concurrency 6 exhausts Chrome; 3 is stable. Lower `--concurrency` before suspecting the
+composition.
 
 ## Status
 
@@ -277,6 +425,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
+| `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
 | `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |
 | `SkoolConnectFilm` | `out/skoolconnect-60s.mp4` | h264 1920x1080 30fps, 1800 frames, 59.93s, 7.9 MB |
 | `WelcomeScreen` | `out/welcome.mp4` | h264 1920x1080 30fps, 150 frames, 5.056s, 1.2 MB |

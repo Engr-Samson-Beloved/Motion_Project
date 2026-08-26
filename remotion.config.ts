@@ -12,3 +12,13 @@ Config.setRspack(true);
 Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);
 Config.overrideBundlerConfig(enableTailwind);
+
+/**
+ * Three.js will not draw under Chrome's default OpenGL renderer — a composition
+ * containing a <ThreeCanvas> renders as an empty frame rather than failing, so
+ * this is easy to lose an entire render pass to.
+ *
+ * Note this file does not apply to the Node.js render APIs. Those need
+ * `chromiumOptions: {gl: "angle"}` passed explicitly.
+ */
+Config.setChromiumOpenGlRenderer("angle");

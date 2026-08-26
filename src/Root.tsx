@@ -1,5 +1,6 @@
 import "./index.css";
 import { Composition } from "remotion";
+import { CinemaProbe } from "./CinemaProbe";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
 import { SkoolConnectReel } from "./skng/reel/SkoolConnectReel";
 import { LowerThird, LowerThirdProps } from "./LowerThird";
@@ -9,6 +10,16 @@ import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* A/B rig for the cinema toolkit. Not a deliverable - see CinemaProbe.tsx. */}
+      <Composition
+        id="CinemaProbe"
+        component={CinemaProbe}
+        durationInFrames={300}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
       <Composition
         id="SkoolConnectReel"
         component={SkoolConnectReel}
