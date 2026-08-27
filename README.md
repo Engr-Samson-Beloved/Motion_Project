@@ -340,6 +340,57 @@ and nothing cut against them will land.
 This is a test rig, not a deliverable. It exists so the toolkit can be judged against
 what it replaced before either film is touched.
 
+### SkoolConnectPulse — 1080x1920, 1800 frames (60s)
+
+The dopamine cut, built entirely from the product's own material rather than from
+approximations of it.
+
+**The real logo, with nothing behind it.** `public/skng-lockup-{dark,light}.png` come from
+the product's `public/modes/`. Both are ~97% fully transparent, so the lockup floats with
+no plate — which retires the white disc earlier pieces needed.
+
+> Two traps in those files. First, `rgba` in `ffprobe` only means a file *has* an alpha
+> channel, not that anything is transparent — decode it if the answer matters. Second,
+> the artwork occupies only the middle of a 3375x3375 canvas (56.7% of the width for the
+> dark lockup, 43.1% for the light one), so setting `width` on the `<Img>` sizes the
+> empty padding and the logo lands at about half the size you asked for. `<Lockup>` holds
+> the measured content box and crops to it, so `width` means the width of the logo.
+
+**The real icons.** `pulse/icons.tsx` ports the SVG paths from
+`components/navigation/bottom-nav.tsx` verbatim, including each icon's filled and stroked
+states. The tab order is the product's own — Feed, Inbox, Network, Resources, Profile —
+and `Network` is not a tab at all: its grid cell renders empty and a gradient FAB sits
+above the bar, exactly as the app does it.
+
+**Real product facts.** Roles are `aspirant -> student -> alumni`, gated by verification.
+Rooms are named `aspirant-lounge`, `student-network`, `alumni-network`.
+
+| # | Scene | Beats |
+|---|---|---|
+| 1 | Ignition — the lockup slams in over a near-black field | 8 |
+| 2 | Hook — group-chat noise, "It is all scattered." | 7 |
+| 3 | Reveal — the phone rises | 7 |
+| 4 | Feed — your campus, not the whole internet | 8 |
+| 5 | Inbox — department chat | 8 |
+| 6 | Network — the centre FAB, alumni and students | 8 |
+| 7 | Resources — past questions | 8 |
+| 8 | Profile — verification ticks | 8 |
+| 9 | Rooms — who belongs where | 7 |
+| 10 | Roles — aspirant, student, alumni | 8 |
+| 11 | Offline — built for a bad network | 6 |
+| 12 | Scale — 170+ institutions | 7 |
+| 13 | CTA — the lockup, skoolconnect.ng | 10 |
+
+**Beat lock.** The bed is 100 BPM, so a beat is exactly 18 frames at 30fps. Every scene
+duration is a multiple of 18 and they sum to **100 beats = 1800 frames = 60s**, which puts
+every hard cut *on* a beat rather than near one. Change a duration only in steps of 18,
+and take the same number of beats off another scene.
+
+**The mark needs a dark ground, not a brand-green one.** The dark lockup's wordmark is
+white but its mark keeps the green gradient, which sits at almost the same value as
+`BRAND.primary` — on the standard dark field the map disappears and only the wordmark
+reads. Logo moments use `DeepField` (near-black) for that reason.
+
 ## Adding a composition — the working recipe
 
 Every piece in this repo was built and confirmed with the same five steps. Follow them
@@ -411,8 +462,20 @@ coming from `<Track>`. That also means the tail fade `<Track>` applies is lost �
 in ffmpeg, or accept a hard out on a test render.
 
 > Remotion's bundled ffmpeg is a **stripped build**. It has `libmp3lame`, `aac` and
-> `libx264`, but no `aevalsrc`, no `alimiter` and no `afade`. Check with
+> `libx264`, but no `aevalsrc`, no `alimiter`, no `afade` and no `overlay`. Check with
 > `ffmpeg -filters` before reaching for one rather than debugging the escaping.
+
+**A graded piece will not encode at CRF 18.** Film grain is unique noise on every frame,
+so inter-frame prediction has nothing to predict and the encoder preserves all of it.
+`SkoolConnectPulse` came out at **586 MB** that way — roughly 78 Mbps. For delivery, cap
+the rate:
+
+```bash
+-c:v libx264 -preset slow -crf 25 -maxrate 12M -bufsize 24M
+```
+
+That is 51 MB for the same 60 seconds, and the grain still reads. Ungraded compositions
+are fine at CRF 18; check the file size on anything using `<FilmGrade>`.
 
 **Render crashes partway with `target-closed` / "The browser crashed while rendering
 frame N".** Memory, not code. At 1080x1920 with several full-frame composited layers,
@@ -425,6 +488,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
+| `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 51.2 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
 | `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |
 | `SkoolConnectFilm` | `out/skoolconnect-60s.mp4` | h264 1920x1080 30fps, 1800 frames, 59.93s, 7.9 MB |

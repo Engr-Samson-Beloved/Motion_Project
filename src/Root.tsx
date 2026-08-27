@@ -2,6 +2,7 @@ import "./index.css";
 import { Composition } from "remotion";
 import { CinemaProbe } from "./CinemaProbe";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
+import { PULSE_DURATION, SkoolConnectPulse } from "./skng/pulse/SkoolConnectPulse";
 import { SkoolConnectReel } from "./skng/reel/SkoolConnectReel";
 import { LowerThird, LowerThirdProps } from "./LowerThird";
 import { TextMotion, TextMotionProps } from "./TextMotion";
@@ -10,6 +11,15 @@ import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      <Composition
+        id="SkoolConnectPulse"
+        component={SkoolConnectPulse}
+        durationInFrames={PULSE_DURATION}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
       {/* A/B rig for the cinema toolkit. Not a deliverable - see CinemaProbe.tsx. */}
       <Composition
         id="CinemaProbe"
