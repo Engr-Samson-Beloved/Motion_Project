@@ -1,0 +1,76 @@
+{
+  "source": "out/skoolconnect-pulse-60s.mp4",
+  "kind": "video",
+  "width": 1080,
+  "height": 1920,
+  "aspect": 0.5625,
+  "orientation": "portrait",
+  "palette": [
+    {
+      "hex": "#eaf4f2",
+      "share": 0.0694,
+      "luminance": 0.947
+    },
+    {
+      "hex": "#1a4c3b",
+      "share": 0.0632,
+      "luminance": 0.251
+    },
+    {
+      "hex": "#1d5b42",
+      "share": 0.0547,
+      "luminance": 0.299
+    },
+    {
+      "hex": "#1b533e",
+      "share": 0.0451,
+      "luminance": 0.272
+    },
+    {
+      "hex": "#0b231d",
+      "share": 0.0364,
+      "luminance": 0.115
+    },
+    {
+      "hex": "#13342b",
+      "share": 0.029,
+      "luminance": 0.175
+    }
+  ],
+  "fps": 30,
+  "durationSeconds": 60,
+  "sampleFps": 15,
+  "cutting": {
+    "cuts": 12,
+    "cutsPerMinute": 12,
+    "threshold": 0.08,
+    "baseline": 0.0022,
+    "shotSeconds": {
+      "median": 4.8,
+      "mean": 5.449,
+      "min": 4.067,
+      "max": 8.533
+    },
+    "medianShotFrames30": 144,
+    "cutSeconds": [
+      0.133,
+      4.867,
+      13.2,
+      18,
+      22.8,
+      27.6,
+      32.4,
+      37.2,
+      41.4,
+      49.933,
+      54,
+      60.067
+    ]
+  },
+  "tempo": {
+    "bpm": 100,
+    "error": 0.0556,
+    "beatFrames": 18,
+    "confidence": 0.778
+  }
+}

@@ -2,57 +2,32 @@ import React from "react";
 import { AbsoluteFill, Series, staticFile } from "remotion";
 import { BRAND } from "../brand";
 import { FilmGrade, HandheldCamera, Track } from "../../lib/cinema";
-import {
-  PulseCTA,
-  PulseFeed,
-  PulseHook,
-  PulseIgnition,
-  PulseInbox,
-  PulseNetwork,
-  PulseOffline,
-  PulseResources,
-  PulseReveal,
-  PulseRoles,
-  PulseRooms,
-  PulseScale,
-  PulseVerify,
-} from "./scenes";
+import { rendererFor } from "./scenes";
+import { SCRIPT, TARGET_BEATS, TOTAL_BEATS, TOTAL_FRAMES, framesFor } from "./script";
 
 /**
  * SkoolConnectNG - Pulse. Vertical 1080x1920, 1800 frames, 60s.
  *
- * Built entirely from the product's own material: the real transparent logo
- * lockup (no plate behind it), the real bottom-nav icons with their filled and
- * stroked states, the real tab order with Network as the centre FAB, and the
- * real role ladder and room names.
+ * This file is only assembly. What the piece says, how long each scene runs and
+ * what is on each screen all live in `script.ts`; how a scene is drawn lives in
+ * `scenes.tsx`. Editing the piece should almost always mean editing the script.
  *
- * BEAT LOCK
- * The bed runs at 100 BPM, which at 30fps is exactly 18 frames per beat. Every
- * scene duration below is a multiple of 18 and they sum to 100 beats, so each
- * hard cut lands on a beat rather than near one. Change a duration only in
- * steps of 18, and take the same number of beats off another scene.
+ * Built from the product's own material: the real transparent logo lockup with
+ * no plate behind it, the real bottom-nav icons with their filled and stroked
+ * states, the real tab order with Network as the centre FAB, and the real role
+ * ladder and room names.
  */
 
-const BEAT = 18;
-const b = (beats: number) => beats * BEAT;
+if (TOTAL_BEATS !== TARGET_BEATS) {
+  // Beat drift is silent otherwise: the piece still renders, it just stops
+  // landing its cuts on the music. Fail loudly at import instead.
+  throw new Error(
+    `Script is ${TOTAL_BEATS} beats, expected ${TARGET_BEATS}. ` +
+      `Add or remove beats elsewhere so the total holds.`,
+  );
+}
 
-const SCENES = [
-  { id: "ignition", beats: 8, Component: PulseIgnition },
-  { id: "hook", beats: 7, Component: PulseHook },
-  { id: "reveal", beats: 7, Component: PulseReveal },
-  { id: "feed", beats: 8, Component: PulseFeed },
-  { id: "inbox", beats: 8, Component: PulseInbox },
-  { id: "network", beats: 8, Component: PulseNetwork },
-  { id: "resources", beats: 8, Component: PulseResources },
-  { id: "verify", beats: 8, Component: PulseVerify },
-  { id: "rooms", beats: 7, Component: PulseRooms },
-  { id: "roles", beats: 8, Component: PulseRoles },
-  { id: "offline", beats: 6, Component: PulseOffline },
-  { id: "scale", beats: 7, Component: PulseScale },
-  { id: "cta", beats: 10, Component: PulseCTA },
-];
-
-export const PULSE_DURATION = SCENES.reduce((n, s) => n + b(s.beats), 0);
+export const PULSE_DURATION = TOTAL_FRAMES;
 
 export const SkoolConnectPulse: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: BRAND.primary }}>
@@ -67,11 +42,14 @@ export const SkoolConnectPulse: React.FC = () => (
     <FilmGrade grain={0.2} bloom={0.32} vignette={0.42} aberration={0.7}>
       <HandheldCamera intensity={0.45} travel={20} sway={0.32} speed={0.5}>
         <Series>
-          {SCENES.map(({ id, beats, Component }) => (
-            <Series.Sequence key={id} durationInFrames={b(beats)}>
-              <Component duration={b(beats)} />
-            </Series.Sequence>
-          ))}
+          {SCRIPT.map((scene) => {
+            const Renderer = rendererFor(scene);
+            return (
+              <Series.Sequence key={scene.id} durationInFrames={framesFor(scene)}>
+                <Renderer scene={scene} />
+              </Series.Sequence>
+            );
+          })}
         </Series>
       </HandheldCamera>
     </FilmGrade>

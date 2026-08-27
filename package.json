@@ -43,6 +43,8 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
+    "storyboard": "remotion still Storyboard out/storyboard.png --gl=angle",
+    "ref": "node scripts/analyze-ref.js",
     "lint": "eslint src && tsc"
   },
   "sideEffects": [

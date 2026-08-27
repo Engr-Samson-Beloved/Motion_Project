@@ -3,6 +3,11 @@ import { Composition } from "remotion";
 import { CinemaProbe } from "./CinemaProbe";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
 import { PULSE_DURATION, SkoolConnectPulse } from "./skng/pulse/SkoolConnectPulse";
+import {
+  STORYBOARD_HEIGHT,
+  STORYBOARD_WIDTH,
+  Storyboard,
+} from "./skng/pulse/Storyboard";
 import { SkoolConnectReel } from "./skng/reel/SkoolConnectReel";
 import { LowerThird, LowerThirdProps } from "./LowerThird";
 import { TextMotion, TextMotionProps } from "./TextMotion";
@@ -11,6 +16,20 @@ import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/*
+        Single-frame contact sheet of every Pulse scene. Render it with
+        `npx remotion still Storyboard out/storyboard.png` — seconds, not the
+        twenty minutes a full pass costs.
+      */}
+      <Composition
+        id="Storyboard"
+        component={Storyboard}
+        durationInFrames={1}
+        fps={30}
+        width={STORYBOARD_WIDTH}
+        height={STORYBOARD_HEIGHT}
+      />
+
       <Composition
         id="SkoolConnectPulse"
         component={SkoolConnectPulse}

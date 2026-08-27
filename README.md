@@ -391,6 +391,80 @@ white but its mark keeps the green gradient, which sits at almost the same value
 `BRAND.primary` — on the standard dark field the map disappears and only the wordmark
 reads. Logo moments use `DeepField` (near-black) for that reason.
 
+## The working loop — script, storyboard, reference
+
+Three pieces exist because the feedback loop was wrong. Four full renders went into
+this project chasing things a one-minute check would have caught: a logo at half
+size, a mark invisible against its own brand colour, a phone with 500px of dead
+space above it.
+
+### 1. The script is data — `src/skng/pulse/script.ts`
+
+Everything anyone would want to change lives in one file that imports no React:
+copy, scene lengths, which tab is lit, and every list row, message bubble and chip.
+
+```ts
+{
+  id: "network",
+  beats: 8,
+  kicker: "Network",
+  title: "Find the people who have been there.",
+  tab: 2,
+  screen: "Network",
+  items: [{ kind: "person", who: "TA", name: "Tunde A.", meta: "Alumni, Software Engineer", alum: true }],
+}
+```
+
+Timing is in **beats, not frames**. One beat is 18 frames at 100 BPM and 30fps, so
+cuts land on the music by construction. `SkoolConnectPulse` throws at import if the
+total drifts from 100 beats — otherwise the piece still renders and just quietly
+stops landing on the beat.
+
+Any scene id without a dedicated renderer falls through to the phone layout, so
+adding a product screen needs no code — only a script entry with `tab`, `screen`
+and `items`.
+
+### 2. The storyboard — see it before you render
+
+```bash
+npm run storyboard      # ~45s, writes out/storyboard.png
+```
+
+All thirteen scenes as one contact sheet, each frozen 62% of the way through so
+every entrance has landed. Numbered, labelled with scene id, timecode, beats and
+frames. Judge layout, copy and pacing here; a full render is twenty minutes.
+
+> Each cell shifts its scene's clock with `<Sequence from={-previewFrame}>`.
+> `<Freeze frame={n}>` reads like the right tool and is not — on a one-frame
+> composition it leaves every cell empty.
+
+### 3. References — `refs/`
+
+```bash
+npm run ref -- refs/something.mp4
+```
+
+Frame-differences a reference to find its actual cut points, then fits a tempo to
+them:
+
+```
+cutting   12 cuts over 60s · median shot 144 frames at 30fps
+tempo     best fit 100 BPM (18 frames/beat) confidence 0.778 -> cut to music
+          to match: set BPM 100 and make every scene a multiple of 18 frames
+```
+
+For an image it reports the dominant palette with shares and luminance, and whether
+the frame is low-, mid- or high-key.
+
+See `refs/README.md` for what direction to give alongside a reference. Dependency
+free — it decodes small PNGs directly, because Remotion's bundled ffmpeg has no
+`fps` filter and no `rawvideo` muxer.
+
+> Cut detection needs a minimum gap between cuts. A hard cut is one spike in frame
+> difference, but a fast move — a motion-blurred slam, a shader transition — is a
+> *run* of large diffs. Without the gap, a piece with 12 real cuts reports 22, and
+> the false ones drag the tempo fit below its confidence threshold.
+
 ## Adding a composition — the working recipe
 
 Every piece in this repo was built and confirmed with the same five steps. Follow them
