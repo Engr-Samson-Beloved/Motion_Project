@@ -64,6 +64,10 @@ export type ScriptScene = {
   profile?: { initials: string; name: string };
   /** Signal bars for the offline scene: how many of four are lit. */
   barsLit?: number;
+  /** Rooms scene. `who` is the access rule, which is the actual point. */
+  rooms?: { name: string; who: string }[];
+  /** Offline scene: what survives without a connection. */
+  status?: { label: string; state: string }[];
 };
 
 export const SCRIPT: ScriptScene[] = [
@@ -188,7 +192,14 @@ export const SCRIPT: ScriptScene[] = [
     kicker: "Rooms",
     title: "Rooms that know who belongs.",
     titleAccentFrom: 3,
-    lines: ["aspirant-lounge", "student-network", "alumni-network"],
+    body: "Verification decides what opens. Nobody wanders in.",
+    // The access rule is the scene. Three room names with three identical
+    // ticks says nothing the headline has not already said.
+    rooms: [
+      { name: "aspirant-lounge", who: "Everyone who joins" },
+      { name: "student-network", who: "Verified students only" },
+      { name: "alumni-network", who: "Alumni only" },
+    ],
   },
   {
     id: "roles",
@@ -201,10 +212,16 @@ export const SCRIPT: ScriptScene[] = [
   {
     id: "offline",
     beats: 6,
+    // No accent: BRAND.secondary against the dark field is close enough in
+    // value that the accented words read as damaged rather than as emphasis.
     title: "Built for a bad network.",
-    titleAccentFrom: 3,
     body: "Offline first. It keeps working when the data does not.",
     barsLit: 2,
+    status: [
+      { label: "Feed", state: "Saved" },
+      { label: "Resources", state: "Offline ready" },
+      { label: "Messages", state: "Queued to send" },
+    ],
   },
   {
     id: "scale",

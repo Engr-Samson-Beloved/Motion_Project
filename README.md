@@ -562,7 +562,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
-| `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 51.2 MB |
+| `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
 | `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |
 | `SkoolConnectFilm` | `out/skoolconnect-60s.mp4` | h264 1920x1080 30fps, 1800 frames, 59.93s, 7.9 MB |

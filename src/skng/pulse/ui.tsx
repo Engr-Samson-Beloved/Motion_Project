@@ -195,13 +195,21 @@ export const DeepField: React.FC<{ glow?: number }> = ({ glow = 0 }) => (
   </>
 );
 
+/**
+ * Light scenes start from white, not from surface.
+ *
+ * FilmGrade's vignette runs over the whole piece, and on a surface-coloured
+ * ground it pulls the edges down into a flat grey that reads as a muddy
+ * screenshot rather than as a light frame. Starting white and falling off to
+ * surface gives the vignette something to eat.
+ */
 export const LightField: React.FC = () => (
   <>
-    <AbsoluteFill style={{ backgroundColor: BRAND.surface }} />
+    <AbsoluteFill style={{ backgroundColor: BRAND.white }} />
     <AbsoluteFill
       style={{
-        background: `radial-gradient(62% 50% at 76% 14%, ${BRAND.white} 0%, rgba(228,244,241,0) 62%)`,
-        opacity: 0.92,
+        background: `radial-gradient(78% 60% at 50% 40%, rgba(255,255,255,0) 28%, ${BRAND.surface} 100%)`,
+        opacity: 0.95,
       }}
     />
   </>

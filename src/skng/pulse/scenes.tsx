@@ -42,13 +42,16 @@ const Stack: React.FC<{
   children: React.ReactNode;
   gap?: number;
   justify?: "center" | "flex-start";
-}> = ({ children, gap = 32, justify = "center" }) => (
+  /** Override for scenes with few elements, which otherwise centre into a
+   *  narrow band with large dead margins above and below. */
+  padding?: string;
+}> = ({ children, gap = 32, justify = "center", padding = "170px 70px 210px" }) => (
   <AbsoluteFill
     style={{
       justifyContent: justify,
       alignItems: "center",
       gap,
-      padding: "170px 70px 210px",
+      padding,
       textAlign: "center",
     }}
   >
@@ -376,12 +379,12 @@ export const PulseHook: React.FC<SceneProps> = ({ scene }) => {
 
 export const PulseRooms: React.FC<SceneProps> = ({ scene }) => {
   const { pop, settle, opacity, pulse } = useScene(scene);
-  const rooms = scene.lines ?? [];
+  const rooms = scene.rooms ?? [];
 
   return (
     <AbsoluteFill style={{ opacity }}>
       <LightField />
-      <Stack gap={26}>
+      <Stack gap={30} padding="130px 64px 150px">
         {scene.kicker ? (
           <Kicker progress={settle(0)} color={BRAND.primary}>
             {scene.kicker}
@@ -393,7 +396,7 @@ export const PulseRooms: React.FC<SceneProps> = ({ scene }) => {
             pop={pop}
             start={3}
             stagger={2}
-            size={70}
+            size={78}
             color={BRAND.ink}
             accent={BRAND.secondary}
             accentFrom={scene.titleAccentFrom ?? -1}
@@ -403,46 +406,76 @@ export const PulseRooms: React.FC<SceneProps> = ({ scene }) => {
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 16,
+            gap: 20,
             width: "100%",
-            marginTop: 10,
+            marginTop: 6,
           }}
         >
           {rooms.map((r, i) => {
             const p = pop(18 + i * 6, 24, 10);
             return (
               <div
-                key={r}
+                key={r.name}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 16,
+                  gap: 20,
                   backgroundColor: BRAND.white,
                   border: `1px solid ${BRAND.border}`,
-                  borderRadius: 14,
-                  padding: "24px 26px",
+                  borderRadius: 16,
+                  padding: "26px 28px",
+                  boxShadow: "0 10px 30px rgba(26,55,63,0.08)",
                   opacity: Math.min(1, p),
                   transform: `translateX(${(1 - p) * 50}px) scale(${1 + pulse * 0.008})`,
                 }}
               >
-                <UsersIcon size={32} color={BRAND.primary} filled />
                 <div
                   style={{
-                    fontFamily: "monospace",
-                    fontSize: 32,
-                    fontWeight: 700,
-                    color: BRAND.ink,
-                    flex: 1,
-                    textAlign: "left",
+                    width: 60,
+                    height: 60,
+                    borderRadius: 14,
+                    backgroundColor: BRAND.surface,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
                 >
-                  {r}
+                  <UsersIcon size={32} color={BRAND.primary} filled />
                 </div>
-                <Tick progress={pop(24 + i * 6)} size={34} />
+                <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: 34,
+                      fontWeight: 700,
+                      color: BRAND.ink,
+                    }}
+                  >
+                    {r.name}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: BODY_FONT,
+                      fontSize: 21,
+                      color: BRAND.ink,
+                      opacity: 0.55,
+                      marginTop: 4,
+                    }}
+                  >
+                    {r.who}
+                  </div>
+                </div>
+                <Tick progress={pop(24 + i * 6)} size={40} />
               </div>
             );
           })}
         </div>
+        {scene.body ? (
+          <Body progress={settle(46)} color={BRAND.ink} size={30}>
+            {scene.body}
+          </Body>
+        ) : null}
       </Stack>
     </AbsoluteFill>
   );
@@ -495,14 +528,15 @@ export const PulseRoles: React.FC<SceneProps> = ({ scene }) => {
 /* ── Offline ──────────────────────────────────────────────────────────── */
 
 export const PulseOffline: React.FC<SceneProps> = ({ scene }) => {
-  const { pop, settle, opacity } = useScene(scene);
+  const { pop, settle, opacity, pulse } = useScene(scene);
   const lit = scene.barsLit ?? 2;
+  const status = scene.status ?? [];
 
   return (
     <AbsoluteFill style={{ opacity }}>
       <DarkField drift={-0.4} />
-      <Stack gap={44}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 18, height: 190 }}>
+      <Stack gap={40} padding="140px 64px 150px">
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 20, height: 210 }}>
           {[0.34, 0.56, 0.78, 1].map((h, i) => {
             const on = i < lit;
             const p = pop(2 + i * 4, 20, 12);
@@ -510,26 +544,81 @@ export const PulseOffline: React.FC<SceneProps> = ({ scene }) => {
               <div
                 key={h}
                 style={{
-                  width: 52,
-                  height: 190 * h * Math.min(1, p),
-                  borderRadius: 10,
-                  backgroundColor: on ? BRAND.white : "rgba(255,255,255,0.18)",
+                  width: 58,
+                  height: 210 * h * Math.min(1, p),
+                  borderRadius: 12,
+                  backgroundColor: on ? BRAND.white : "rgba(255,255,255,0.16)",
                 }}
               />
             );
           })}
         </div>
+
         {scene.title ? (
           <Headline
             text={scene.title}
             pop={pop}
-            start={16}
-            size={80}
-            accent={BRAND.secondary}
+            start={14}
+            size={84}
             accentFrom={scene.titleAccentFrom ?? -1}
           />
         ) : null}
-        {scene.body ? <Body progress={settle(38)}>{scene.body}</Body> : null}
+
+        {/*
+          The claim needs evidence. Two dead signal bars and a sentence is an
+          assertion; naming what survives the outage is the product working.
+        */}
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%" }}
+        >
+          {status.map((s, i) => {
+            const p = pop(26 + i * 6, 22, 10);
+            return (
+              <div
+                key={s.label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 18,
+                  backgroundColor: "rgba(255,255,255,0.09)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  borderRadius: 14,
+                  padding: "20px 26px",
+                  opacity: Math.min(1, p),
+                  transform: `translateY(${(1 - p) * 26}px) scale(${1 + pulse * 0.006})`,
+                }}
+              >
+                <Tick progress={pop(30 + i * 6)} size={38} />
+                <div
+                  style={{
+                    fontFamily: HEADING_FONT,
+                    fontSize: 32,
+                    fontWeight: 800,
+                    letterSpacing: HEADING_TRACKING,
+                    color: BRAND.white,
+                    flex: 1,
+                    textAlign: "left",
+                  }}
+                >
+                  {s.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: BODY_FONT,
+                    fontSize: 24,
+                    fontWeight: 600,
+                    color: BRAND.surface,
+                    opacity: 0.72,
+                  }}
+                >
+                  {s.state}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {scene.body ? <Body progress={settle(44)}>{scene.body}</Body> : null}
       </Stack>
     </AbsoluteFill>
   );

@@ -39,7 +39,14 @@ export const SkoolConnectPulse: React.FC = () => (
       deliberately low: at this cutting rate anything stronger reads as a wobble
       rather than as a held frame.
     */}
-    <FilmGrade grain={0.2} bloom={0.32} vignette={0.42} aberration={0.7}>
+    {/*
+      Vignette stays low on purpose. DarkField and DeepField already carry
+      their own ink falloff, so a strong global vignette double-darkens the
+      dark scenes and, worse, turns the light ones (rooms, scale) into flat
+      grey — black at 42% over white is grey, and no amount of brightening
+      inside the scene can win against it.
+    */}
+    <FilmGrade grain={0.2} bloom={0.32} vignette={0.2} aberration={0.7}>
       <HandheldCamera intensity={0.45} travel={20} sway={0.32} speed={0.5}>
         <Series>
           {SCRIPT.map((scene) => {
