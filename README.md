@@ -38,7 +38,10 @@ src/
   LowerThird.tsx     3s broadcast name tag.
   CinemaProbe.tsx    A/B rig for the cinema toolkit. Not a deliverable.
   index.css          Tailwind entry.
+  CharacterSheet.tsx One walk cycle at 8 phases. The rig's verification still.
+  CharacterLab.tsx   The rig moving: walk, blend, wave. 180 frames.
   lib/cinema/        Brand-agnostic film-look toolkit (see below).
+  lib/character/     Jointed 2D character rig and its motion cycles.
   skng/              SkoolConnectNG brand system, scenes and films.
     reel/            Vertical 9:16 cut.
     pulse/           Vertical 60s cut, beat-locked, built from product assets.
@@ -49,10 +52,13 @@ public/
   skng-lockup-*.png  The full lockup, dark and light. 3375x3375, ~97% transparent.
   bed.mp3            60s music bed at 100 BPM. Beat = 18 frames at 30fps.
   bed90.mp3          90s arranged bed at 120 BPM, for the story film.
+  screens/           Captured app screens (gitignored). See its README.
 scripts/
   measure-png.js     Alpha bounding box of a PNG, as canvas fractions.
   make-bed90.js      Synthesizes public/bed90.mp3.
   vo-sheet.js        Voice-over cue sheet from src/skng/story/script.ts.
+  capture-screens.js Screenshots the running app into public/screens/.
+  restore-binaries.ps1  Undoes the file infector. Run before long renders.
   analyze-ref.js     Reference image/video analyzer. See "References" below.
 remotion.config.ts   Bundler + render settings.
 ```
@@ -498,6 +504,100 @@ npm run vo-sheet                             # out/vo-script.txt
 npm run bed90                                # regenerate public/bed90.mp3
 npx remotion render SkoolConnectStory out/story-frames --sequence --image-format=jpeg
 ```
+
+## Character animation — `src/lib/character/`
+
+A jointed 2D rig, hand-built, no dependencies and no asset files.
+
+```tsx
+import { Character, walk, idle, wave, study, blendPose } from "./lib/character";
+
+<Character pose={walk(frame, fps)} size={520} color="#F0F6F5" farColor="#7E8B95" />
+```
+
+The rig is a *hierarchy*, not a set of independently placed parts: the shin
+rotates inside the thigh's group, so bending the hip carries the whole leg and
+the knee stays attached. That is the entire trick — a few sine waves in
+`cycles.ts` then produce a walk rather than a twitch.
+
+Every cycle is `f(frame) -> pose`, like everything else here. Scrubbing to frame
+1,412 gives the same pose as rendering to it, with no playhead state to keep in
+sync. That is the reason to rig rather than import an animation file.
+
+| Piece | What it does |
+|---|---|
+| `walk(frame, fps, speed?)` | Counter-phase legs, knees bending only on the swing, arms opposing their own leg, two body rises per stride |
+| `idle(frame, fps)` | A breath and a slow head drift. A held pose is the clearest tell that nothing is animating |
+| `wave(frame, fps)` | A wave over an idle body, so the rest keeps breathing |
+| `study(frame, fps)` | Seated, head down |
+| `blendPose(a, b, t)` | Crossfades joint angles, so a walk settles into a stand instead of snapping |
+
+**Verify with `CharacterSheet`, not by watching.** It renders one walk cycle at
+eight even phases as a single still:
+
+```bash
+npx remotion still CharacterSheet out/character-sheet.png
+```
+
+If the legs alternate, the knees bend only on the swing leg, and each arm
+opposes its own leg, the walk is right. `CharacterLab` (180 frames) then shows
+it moving — walk, blend, wave — for when you need to see it rather than read it.
+
+Two things the sheet caught that were invisible in code: a 10-wide arm pivoting
+on the centreline vanishes inside a 28-wide torso, so shoulders sit 6 units off
+axis; and the ground line has to be computed from the rig (`top + 0.9205 × height`)
+rather than placed by eye, or the character hovers.
+
+### If you want richer character work
+
+The rig is deliberately simple — flat, jointed, silhouette-friendly, and a match
+for the story film's visual language. For expressive, hand-animated character
+work the route is **`@remotion/lottie`**: it takes an After Effects export and
+plays it frame-accurately, so a commissioned or licensed Lottie file drops
+straight in. That is a sourcing decision, not an engineering one; nothing in the
+repo blocks it.
+
+## Screenshots of the real app — `scripts/capture-screens.js`
+
+```bash
+node scripts/capture-screens.js          # SKNG_URL=... to point elsewhere
+```
+
+Writes two PNGs per route into `public/screens/`: the viewport, and the whole
+scrollable page. The full-page one is the useful one — dropped into the phone
+shell and translated on Y by frame, it *is* a scroll, carrying the app's real
+type, spacing and data.
+
+Runs two ways. With **`puppeteer-core`** (`npm i -D --save-exact puppeteer-core`)
+it drives the Chrome already installed on this machine — no 150 MB browser
+download, one small pure-JS package rather than another binary for the infector
+to find — and it can carry a session cookie, so authenticated routes work. With
+nothing installed it falls back to Chrome's own `--headless --screenshot` flag,
+which cannot log in, cannot wait for content and cannot capture full-page.
+Run `scripts\restore-binaries.ps1` after any install.
+
+Animate them with `src/skng/story/screens.tsx`:
+
+| Piece | What it does |
+|---|---|
+| `ScreenShot` | A capture in a viewport: scroll, zoom about a focus point, clip |
+| `scrollAt(frame, stops)` | Eased scroll between `[frame, position]` stops — a linear scroll reads as a machine |
+| `ScreenSwap` | `push` for a stack navigator, `fade` for a tab change. The outgoing screen drifts, which is most of what sells a native push |
+| `Tap` | A ring where a finger went. Without it the app appears to navigate itself |
+| `<Phone bare>` | Hands the whole screen over — a real capture already contains its own status bar and tab bar |
+
+**Check `scrollRange()` before animating a scroll.** A capture only slightly
+taller than the screen gives a few dozen pixels of travel: 1750×3820 in a
+454×940 screen is 51px, which reads as a glitch. A small range means the page
+was captured at the viewport instead of full-page, or the screen genuinely does
+not scroll and the beat should hold.
+
+**Screenshots and animation trade off against each other**, and this is the
+thing to decide per beat. A screenshot is one flat bitmap — it can scroll, hold,
+swap, zoom and be masked, but a single card cannot fly out of it and connect to
+something else. Beats that need elements to come apart use the rebuilt
+components in `story/product.tsx`; beats that need to say "this is really the
+product" use a capture. The two are meant to be mixed in one film.
 
 ## The working loop — script, storyboard, reference
 

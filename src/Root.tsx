@@ -1,6 +1,12 @@
 import "./index.css";
 import { Composition } from "remotion";
 import { CinemaProbe } from "./CinemaProbe";
+import {
+  CHARACTER_SHEET_HEIGHT,
+  CHARACTER_SHEET_WIDTH,
+  CharacterSheet,
+} from "./CharacterSheet";
+import { CHARACTER_LAB_DURATION, CharacterLab } from "./CharacterLab";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
 import { PULSE_DURATION, SkoolConnectPulse } from "./skng/pulse/SkoolConnectPulse";
 import {
@@ -36,6 +42,26 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
+      />
+
+      {/* The character rig moving: walk, blend, wave. See CharacterLab.tsx. */}
+      <Composition
+        id="CharacterLab"
+        component={CharacterLab}
+        durationInFrames={CHARACTER_LAB_DURATION}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+
+      {/* Cycle check for the character rig. One still, see CharacterSheet.tsx. */}
+      <Composition
+        id="CharacterSheet"
+        component={CharacterSheet}
+        durationInFrames={1}
+        fps={30}
+        width={CHARACTER_SHEET_WIDTH}
+        height={CHARACTER_SHEET_HEIGHT}
       />
 
       {/* Its contact sheet: three sampled frames per scene, one still. */}

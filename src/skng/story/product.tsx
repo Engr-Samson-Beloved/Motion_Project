@@ -135,12 +135,21 @@ export const Phone: React.FC<{
   activeTab?: number;
   width?: number;
   height?: number;
+  /**
+   * Hand the children the entire screen: no notch, no inset, no tab bar.
+   *
+   * A real screenshot already contains the app's status bar and its own tab
+   * bar. Dropped into the normal inset viewport it gets squeezed between a
+   * drawn notch and a drawn tab bar, and the phone ends up with two of each.
+   */
+  bare?: boolean;
 }> = ({
   progress,
   children,
   activeTab = 0,
   width = PHONE_W,
   height = PHONE_H,
+  bare = false,
 }) => {
   const p = ease(Math.max(0, Math.min(1, progress)));
   return (
@@ -158,19 +167,21 @@ export const Phone: React.FC<{
         transform: `translateY(${(1 - p) * 46}px) scale(${0.94 + p * 0.06})`,
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 12,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 104,
-          height: 20,
-          borderRadius: 16,
-          backgroundColor: STORY.dark,
-          zIndex: 4,
-        }}
-      />
+      {bare ? null : (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 104,
+            height: 20,
+            borderRadius: 16,
+            backgroundColor: STORY.dark,
+            zIndex: 4,
+          }}
+        />
+      )}
       <div
         style={{
           position: "absolute",
@@ -189,17 +200,17 @@ export const Phone: React.FC<{
         <div
           style={{
             position: "absolute",
-            top: 46,
+            top: bare ? 0 : 46,
             left: 0,
             right: 0,
-            bottom: 84,
+            bottom: bare ? 0 : 84,
             overflow: "hidden",
           }}
         >
           {children}
         </div>
       </div>
-      <TabBar active={activeTab} />
+      {bare ? null : <TabBar active={activeTab} />}
     </div>
   );
 };

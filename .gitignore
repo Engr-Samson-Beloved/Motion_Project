@@ -12,3 +12,7 @@ out
 refs/*
 !refs/README.md
 !refs/*.json
+
+# Captured app screens: large, stale quickly, may hold real user data.
+public/screens/*
+!public/screens/README.md
