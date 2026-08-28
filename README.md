@@ -41,10 +41,19 @@ src/
   lib/cinema/        Brand-agnostic film-look toolkit (see below).
   skng/              SkoolConnectNG brand system, scenes and films.
     reel/            Vertical 9:16 cut.
+    pulse/           Vertical 60s cut, beat-locked, built from product assets.
+    story/           16:9 90s awareness film. Its own palette — see below.
     three/           3D scenes.
 public/
-  skng-logo.png      The mark.
+  skng-logo.png      The mark on its own. 512x512, 73% transparent.
+  skng-lockup-*.png  The full lockup, dark and light. 3375x3375, ~97% transparent.
   bed.mp3            60s music bed at 100 BPM. Beat = 18 frames at 30fps.
+  bed90.mp3          90s arranged bed at 120 BPM, for the story film.
+scripts/
+  measure-png.js     Alpha bounding box of a PNG, as canvas fractions.
+  make-bed90.js      Synthesizes public/bed90.mp3.
+  vo-sheet.js        Voice-over cue sheet from src/skng/story/script.ts.
+  analyze-ref.js     Reference image/video analyzer. See "References" below.
 remotion.config.ts   Bundler + render settings.
 ```
 
@@ -146,23 +155,53 @@ file infector. It replaces an executable with a **533,504-byte** stub (SHA-256
 `AA1DD5B1…`) and preserves the original alongside it as `g<name>.exe`, plus a 0-byte
 `g<name>.ico`. Infected binaries hang instead of running.
 
-```powershell
-# find them
-Get-ChildItem node_modules -Recurse -Filter *.exe | Where-Object { $_.Length -eq 533504 }
+There is a script for this. Run it before any long render, and again if one stalls:
 
-# restore one
-Remove-Item $dir\esbuild.exe; Move-Item $dir\gesbuild.exe $dir\esbuild.exe
-Remove-Item $dir\gesbuild.ico
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\restore-binaries.ps1
+powershell -ExecutionPolicy Bypass -File scripts\restore-binaries.ps1 -ScanOnly   # report only
 ```
 
+It also catches the case a size scan misses: **the stub does not always survive.**
+`ffmpeg.exe` once vanished outright, leaving only the hidden `gffmpeg.exe` beside it — a
+533,504-byte scan calls that clean while every ffmpeg call fails with *"not recognized as
+the name of a cmdlet"*. A `g<name>.exe` whose `<name>.exe` is missing is the same
+infection and needs the same restore.
+
+Re-infection happens **during renders**, not only during `npm install`. In one session it
+struck eight times across `esbuild.exe`, `ffmpeg.exe`, `ffprobe.exe` and
+`chrome-headless-shell.exe` — twice within minutes of a restore.
+
 `esbuild.exe` is the one that bites: Remotion loads `remotion.config.ts` through esbuild
-on **every** command, so an infected esbuild hangs the CLI before anything starts.
-`npm install` is when re-infection happens — check before and after every install.
+on **every** command, so an infected esbuild hangs the CLI before anything starts — with
+no error and no output. That failure is easy to misread: a `remotion still` that sat for
+25 minutes with an `esbuild.exe` child looked exactly like a slow bundle, and was an
+infected binary. **Check CPU, not just process presence** — a blocked stub burns none:
+
+```powershell
+$a=(Get-Process -Id <pid>).CPU; Start-Sleep 6; (Get-Process -Id <pid>).CPU - $a
+```
+
+With a clean esbuild the same still rendered in under a minute.
 
 `C:\Program Files\Git\bin\bash.exe` is also infected, so anything routed through Git Bash
 hangs. Use PowerShell. The real fix is a **Microsoft Defender Offline Scan** (Windows
 Security → Virus & threat protection → Scan options); Defender's real-time protection
 does not detect this one.
+
+**A still that "hangs" is usually just bundling.** `remotion still` bundles the whole of
+`src/` before it opens a browser, and on a cold cache that is several minutes on this
+machine — with no output at all until it finishes. Before assuming a hang, check for
+child processes:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "ParentProcessId=<node pid>" |
+  Select-Object ProcessId, Name
+```
+
+`esbuild.exe` means it is bundling; `chrome-headless-shell.exe` means it has started
+rendering. Neither, after a few minutes, is a real hang. Killing it and restarting throws
+the cache away and pays the cost again — the second run is the fast one.
 
 **Headless Shell download stalls.** Remotion downloads a 113 MB Chrome Headless Shell on
 first render. If the download times out repeatedly, point it at an installed Chrome
@@ -391,6 +430,75 @@ white but its mark keeps the green gradient, which sits at almost the same value
 `BRAND.primary` — on the standard dark field the map disappears and only the wordmark
 reads. Logo moments use `DeepField` (near-black) for that reason.
 
+### SkoolConnectStory — 1920x1080, 2700 frames (90s)
+
+`src/skng/story/`. An awareness film: problem, solution, vision, voice-over led. Built to
+a supplied brief whose two hardest constraints shaped every file in the directory.
+
+| # | Scene | Time | Frames | What happens |
+|---|---|---|---|---|
+| 01 | `story` | 00:00–00:08 | 240 | One student. Dream, question, opportunity move toward them. Pull back: a country of students, all disconnected. |
+| 02 | `scatter` | 00:08–00:22 | 420 | Eighteen clutter cards arrive and drift, faster as it goes. Duplicates. Struck-through cards for what can't be trusted. |
+| 03 | `missing` | 00:22–00:34 | 360 | Hard freeze on scene 02's exact last frame. Zoom out to Nigeria. A line reaches from Lagos toward Maiduguri and stops halfway. |
+| 04 | `question` | 00:34–00:43 | 270 | A green circle. People, Information, Resources, Opportunities orbit it, then converge to one point. |
+| 05 | `reveal` | 00:43–00:50 | 210 | The supplied lockup. Lines extend out to nodes across the country. The interface rises into place. |
+| 06 | `connect` | 00:50–01:05 | 450 | Network tab, then a growing constellation of students, then the community feed. One continuous phone. |
+| 07 | `discover` | 01:05–01:18 | 390 | Resources reaching students by wire, then Discover, then verified school information. |
+| 08 | `boundary` | 01:18–01:25 | 210 | A campus rectangle. The student steps out. The rectangle becomes the country. |
+| 09 | `vision` | 01:25–01:30 | 150 | The full network, breathing. Logo, one line, held clean for two seconds. |
+
+**No gradients, anywhere.** The brief says solid colours only, and that constraint reaches
+further than it first looks. It rules out `DarkField`, `DeepField` and `LightField` from
+`pulse/ui.tsx` — all three are radial gradients — and it rules out two thirds of the film
+grade, since bloom and vignette are both falloffs. So `story/` was built from scratch
+rather than assembled from the existing kit, and the grade runs
+`grain 0.13 / bloom 0 / vignette 0 / aberration 0.5`. Depth comes from flat value steps
+(`dark` → `dark2` → `line` → `line2`), from a hairline grid, and from scale.
+
+The product's own FAB is a three-stop gradient disc with a blurred gradient glow behind
+it. In `story/product.tsx` it is a solid green disc: same shape, same position, same
+affordance, one fill instead of three. That is the only place the reproduction departs
+from the app, and it departs because the brief requires it.
+
+**Its own palette.** `story/palette.ts` is *not* `skng/brand.ts`. The brief supplies a
+dark-first film palette (`#278058` on `#171E26`); `brand.ts` is the product's light-surface
+palette (`#165538` on `#e4f4f1`). The two coexist — the other four compositions still use
+`BRAND` and are untouched.
+
+**Scene boundaries are fixed to the second**, which rules out `TransitionSeries`: its
+overlaps would pull every subsequent cut off its timecode. Scenes dissolve themselves with
+`sceneFade` on a plain `<Series>` instead. Three cuts are deliberately hard — 02 into 03
+is the freeze, 05 into 06 hands a moving phone across the cut, and 08 into 09 runs
+straight through.
+
+**Durations are derived, not typed.** `framesFor()` parses the `mm:ss-mm:ss` label, and
+`SkoolConnectStory.tsx` throws at import if the total is not exactly 2700. Re-time a scene
+and the film tells you immediately instead of silently becoming 91 seconds.
+
+**The map is real geography.** `story/nigeria.ts` holds a ~90-vertex outline in true
+degrees and 28 real university cities by coordinate. One `<NigeriaMap>` serves scenes 03,
+05, 08 and 09, because those are the same picture at four stages.
+
+**Voice-over is a slot, not a stub.** No recording was supplied, so the film renders with
+music only. The lines live in `script.ts` as cue data, `npm run vo-sheet` turns them into
+a recording script with absolute timings, and flipping `VOICEOVER` in
+`SkoolConnectStory.tsx` mounts `public/vo.mp3` and ducks the bed from 0.82 to 0.34. The
+copy is the brief's verbatim: 208 words over 90s, or 139 wpm — it fits, with no slack.
+
+**The bed is arranged, not looped.** `scripts/make-bed90.js` writes 90s at 120 BPM, which
+is two beats per second — and since every scene boundary in the brief is a whole second,
+every boundary also lands on a beat. Twelve sections follow the brief's arc
+(atmospheric → tense → anticipation → open → confident → warm), with the opening in half
+time so it doesn't drive. One low impact at the reveal and one at the expansion; the brief
+rules out excessive booms.
+
+```bash
+npm run story-board                          # contact sheet, seconds not minutes
+npm run vo-sheet                             # out/vo-script.txt
+npm run bed90                                # regenerate public/bed90.mp3
+npx remotion render SkoolConnectStory out/story-frames --sequence --image-format=jpeg
+```
+
 ## The working loop — script, storyboard, reference
 
 Three pieces exist because the feedback loop was wrong. Four full renders went into
@@ -548,6 +656,11 @@ the rate:
 -c:v libx264 -preset slow -crf 25 -maxrate 12M -bufsize 24M
 ```
 
+Lowering the grain does **not** get you out of this. `SkoolConnectStory` runs grain at
+0.13 — well under Pulse's 0.2 — and still came out at **331 MB** on plain `-crf 21`, or
+29.5 Mbps for 90 seconds. Capped at `-crf 24 -maxrate 10M -bufsize 20M` it is 37.9 MB with
+no visible loss. Assume any `<FilmGrade>` composition needs the cap.
+
 That is 51 MB for the same 60 seconds, and the grain still reads. Ungraded compositions
 are fine at CRF 18; check the file size on anything using `<FilmGrade>`.
 
@@ -562,6 +675,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 
 | Composition | Output | Result |
 |---|---|---|
+| `SkoolConnectStory` | `out/skoolconnect-story-90s.mp4` | h264 **1920x1080** 30fps, 2700 frames, 90.000s, AAC stereo, 37.9 MB |
 | `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
 | `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |

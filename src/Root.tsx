@@ -8,6 +8,15 @@ import {
   STORYBOARD_WIDTH,
   Storyboard,
 } from "./skng/pulse/Storyboard";
+import {
+  STORY_DURATION,
+  SkoolConnectStory,
+} from "./skng/story/SkoolConnectStory";
+import {
+  STORYBOARD_HEIGHT as STORY_BOARD_HEIGHT,
+  STORYBOARD_WIDTH as STORY_BOARD_WIDTH,
+  Storyboard as StoryBoard,
+} from "./skng/story/Storyboard";
 import { SkoolConnectReel } from "./skng/reel/SkoolConnectReel";
 import { LowerThird, LowerThirdProps } from "./LowerThird";
 import { TextMotion, TextMotionProps } from "./TextMotion";
@@ -16,6 +25,29 @@ import { WelcomeScreen, WelcomeScreenProps } from "./WelcomeScreen";
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/*
+        The 90-second story film for awareness: problem, solution, vision.
+        16:9, voice-over led, built to the supplied brief's timecodes.
+      */}
+      <Composition
+        id="SkoolConnectStory"
+        component={SkoolConnectStory}
+        durationInFrames={STORY_DURATION}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+
+      {/* Its contact sheet: three sampled frames per scene, one still. */}
+      <Composition
+        id="StoryBoard"
+        component={StoryBoard}
+        durationInFrames={1}
+        fps={30}
+        width={STORY_BOARD_WIDTH}
+        height={STORY_BOARD_HEIGHT}
+      />
+
       {/*
         Single-frame contact sheet of every Pulse scene. Render it with
         `npx remotion still Storyboard out/storyboard.png` — seconds, not the

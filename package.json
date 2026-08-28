@@ -44,6 +44,10 @@
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "storyboard": "remotion still Storyboard out/storyboard.png --gl=angle",
+    "story-board": "remotion still StoryBoard out/story-board.png",
+    "vo-sheet": "node scripts/vo-sheet.js out/vo-script.txt",
+    "bed90": "node scripts/make-bed90.js",
+    "measure": "node scripts/measure-png.js",
     "ref": "node scripts/analyze-ref.js",
     "lint": "eslint src && tsc"
   },
