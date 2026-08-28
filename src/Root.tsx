@@ -7,6 +7,15 @@ import {
   CharacterSheet,
 } from "./CharacterSheet";
 import { CHARACTER_LAB_DURATION, CharacterLab } from "./CharacterLab";
+import {
+  SAME_QUESTION_DURATION,
+  SameQuestion,
+} from "./skng/together/SameQuestion";
+import {
+  BOARD_HEIGHT,
+  BOARD_WIDTH,
+  Board as SameQuestionBoard,
+} from "./skng/together/Board";
 import { SkoolConnectFilm } from "./skng/SkoolConnectFilm";
 import { PULSE_DURATION, SkoolConnectPulse } from "./skng/pulse/SkoolConnectPulse";
 import {
@@ -42,6 +51,29 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
+      />
+
+      {/*
+        Character-led 30s piece: seven students, one question, one answer.
+        No product UI at all — the argument made with people instead.
+      */}
+      <Composition
+        id="SameQuestion"
+        component={SameQuestion}
+        durationInFrames={SAME_QUESTION_DURATION}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
+      {/* Its contact sheet: eight sampled frames, one still. */}
+      <Composition
+        id="SameQuestionBoard"
+        component={SameQuestionBoard}
+        durationInFrames={1}
+        fps={30}
+        width={BOARD_WIDTH}
+        height={BOARD_HEIGHT}
       />
 
       {/* The character rig moving: walk, blend, wave. See CharacterLab.tsx. */}

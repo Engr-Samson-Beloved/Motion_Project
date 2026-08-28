@@ -46,16 +46,20 @@ src/
     reel/            Vertical 9:16 cut.
     pulse/           Vertical 60s cut, beat-locked, built from product assets.
     story/           16:9 90s awareness film. Its own palette — see below.
+    together/        9:16 30s character-led piece. No product UI.
     three/           3D scenes.
 public/
   skng-logo.png      The mark on its own. 512x512, 73% transparent.
   skng-lockup-*.png  The full lockup, dark and light. 3375x3375, ~97% transparent.
   bed.mp3            60s music bed at 100 BPM. Beat = 18 frames at 30fps.
   bed90.mp3          90s arranged bed at 120 BPM, for the story film.
+  bed30.mp3          30s arranged bed at 120 BPM, for SameQuestion.
   screens/           Captured app screens (gitignored). See its README.
 scripts/
+  lib/synth.js       Deterministic music-bed synthesiser. Beds are arrangements.
   measure-png.js     Alpha bounding box of a PNG, as canvas fractions.
-  make-bed90.js      Synthesizes public/bed90.mp3.
+  make-bed90.js      Arrangement for public/bed90.mp3.
+  make-bed30.js      Arrangement for public/bed30.mp3.
   vo-sheet.js        Voice-over cue sheet from src/skng/story/script.ts.
   capture-screens.js Screenshots the running app into public/screens/.
   restore-binaries.ps1  Undoes the file infector. Run before long renders.
@@ -505,6 +509,41 @@ npm run bed90                                # regenerate public/bed90.mp3
 npx remotion render SkoolConnectStory out/story-frames --sequence --image-format=jpeg
 ```
 
+### SameQuestion — 1080x1920, 900 frames (30s)
+
+`src/skng/together/`. A character-led piece: no product UI at all. Seven students
+in seven places, each stuck on the same question. Lines find them, an answer
+travels along the lines, the question marks become ticks, and they end up
+waving. It makes the same argument as the 90-second film with people instead of
+screens — which is the only reason it is a separate piece rather than characters
+bolted onto that one.
+
+| Frames | Beat |
+|---|---|
+| 0–150 | Alone. One student walks in, pushed in tight, one question mark |
+| 150–330 | The camera pulls back and finds six more, each with the same question |
+| 330–510 | Green lines draw between them, one edge at a time |
+| 510–690 | An answer travels the lines outward from the hero; each question becomes a tick as it arrives |
+| 690–810 | Everyone waving, out of phase with each other |
+| 810–900 | Lockup, one line, held clean |
+
+**One continuous shot, not a `<Series>`.** The same seven characters are on
+screen throughout and the camera never cuts, so sectioning it would re-mount
+every character at each boundary and lose its cycle phase.
+
+Same brand rules as the story film — the `story/palette.ts` tokens, solid
+colours only, `FilmGrade` at `bloom 0 / vignette 0` — so the two sit together.
+
+`cast.ts` holds everything: positions, cycles, phase offsets, the edge list,
+and the frame each student's answer arrives. `BEATS` there are also the section
+boundaries in `scripts/make-bed30.js`; move one and move the other, or the cuts
+drift off the music.
+
+```bash
+npm run same-board        # eight sampled frames, one still
+npm run bed30             # regenerate public/bed30.mp3
+```
+
 ## Character animation — `src/lib/character/`
 
 A jointed 2D rig, hand-built, no dependencies and no asset files.
@@ -776,6 +815,8 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 | Composition | Output | Result |
 |---|---|---|
 | `SkoolConnectStory` | `out/skoolconnect-story-90s.mp4` | h264 **1920x1080** 30fps, 2700 frames, 90.000s, AAC stereo, 37.9 MB |
+| `SameQuestion` | `out/same-question-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 9.6 MB |
+| `CharacterLab` | `out/character-lab.mp4` | h264 1920x1080 30fps, 180 frames, 6.000s, 136 kB |
 | `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
 | `SkoolConnectReel` | `out/skoolconnect-reel-60s.mp4` | h264 **1080x1920** 30fps, 1800 frames, 59.93s, 10.4 MB |

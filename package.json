@@ -47,6 +47,9 @@
     "story-board": "remotion still StoryBoard out/story-board.png",
     "vo-sheet": "node scripts/vo-sheet.js out/vo-script.txt",
     "bed90": "node scripts/make-bed90.js",
+    "bed30": "node scripts/make-bed30.js",
+    "same-board": "remotion still SameQuestionBoard out/same-question-board.png",
+    "char-sheet": "remotion still CharacterSheet out/character-sheet.png",
     "measure": "node scripts/measure-png.js",
     "ref": "node scripts/analyze-ref.js",
     "lint": "eslint src && tsc"
