@@ -28,6 +28,7 @@ import {
   TARGET_FRAMES,
   TOTAL_FRAMES,
   WEB,
+  WEB_DRAW,
   WEB_EDGES,
   WEB_WIDTH,
   stripAt,
@@ -126,17 +127,27 @@ export const CampusTour: React.FC = () => {
   const entry = (1 - eramp(frame, 112, 158)) * 460;
   const stageIn = eramp(frame, 104, 148);
 
-  const webP = eramp(frame, T.web, T.web + 66);
+  // The profile has to be *at* its slot before any wire is drawn to that slot,
+  // or the first spokes hang in space next to it.
+  const webP = eramp(frame, T.web, T.web + 34);
   const outP = eramp(frame, T.lockup, T.lockup + 34);
 
-  /** Where shot `i` sits, including its push-in. */
+  /**
+   * Where shot `i` sits, including its push-in.
+   *
+   * All of this works in *rest space* — as though the row were already in
+   * place — and `entry` is added at the very end. It has to be that way round:
+   * the rail clamp below is an absolute floor, so with the entry offset folded
+   * in early it clamped the first device straight back up to the floor and the
+   * rise-in never happened at all. The stage fade hid it, which is exactly the
+   * kind of bug that survives a contact sheet.
+   */
   const place = (i: number) => {
     const shot = SHOTS[i];
     const stripX = DEVICE_X + i * SLOT + panX;
-    const stripY = DEVICE_Y + entry;
 
     if (shot.detail !== "push") {
-      return { cx: stripX, cy: stripY, width: DEVICE_W };
+      return { cx: stripX, cy: DEVICE_Y + entry, width: DEVICE_W };
     }
 
     const start = T.shots[i];
@@ -153,7 +164,7 @@ export const CampusTour: React.FC = () => {
     // Carry that point most of the way to the middle of the frame, and scale
     // about it rather than about the device centre.
     const px = stripX + fx + (W / 2 - (stripX + fx)) * push * 0.8;
-    const py = stripY + fy + (DEVICE_Y - 40 - (stripY + fy)) * push * 0.8;
+    const py = DEVICE_Y + fy + (DEVICE_Y - 40 - (DEVICE_Y + fy)) * push * 0.8;
 
     // Bringing a *high* region to the middle of the frame moves the device
     // down, and a device scaled up and moved down runs straight through its
@@ -161,9 +172,9 @@ export const CampusTour: React.FC = () => {
     // A push-in may raise the device or hold it, never lower it, and its foot
     // may never cross the rail.
     const halfH = (DEVICE_H * k) / 2;
-    const cy = Math.min(py - k * fy, stripY, RAIL_Y - 18 - halfH);
+    const cy = Math.min(py - k * fy, DEVICE_Y, RAIL_Y - 18 - halfH);
 
-    return { cx: px - k * fx, cy, width: DEVICE_W * k };
+    return { cx: px - k * fx, cy: cy + entry, width: DEVICE_W * k };
   };
 
   /** How far the lens for shot `i` has been lifted. */
@@ -257,7 +268,7 @@ export const CampusTour: React.FC = () => {
                     key={i}
                     a={WEB[e.from]}
                     b={WEB[e.to]}
-                    progress={ramp(frame, T.web + e.at, T.web + e.at + 34)}
+                    progress={ramp(frame, T.web + e.at, T.web + e.at + WEB_DRAW)}
                     color={TOUR.green}
                     width={2.6}
                     opacity={0.85}
@@ -269,7 +280,7 @@ export const CampusTour: React.FC = () => {
             {/* The other six, arriving at their places in the constellation. */}
             {webP > 0
               ? WEB_ORDER.map((i, k) => {
-                  const p = eramp(frame, T.web + 8 + k * 6, T.web + 38 + k * 6);
+                  const p = eramp(frame, T.web + 8 + k * 4, T.web + 32 + k * 4);
                   return (
                     <Device
                       key={`web${i}`}
@@ -399,13 +410,17 @@ const EndCard: React.FC<{ frame: number }> = ({ frame }) => {
   const t = frame - T.lockup;
   if (t < 0) return null;
 
-  const logo = eramp(t, 14, 48);
+  // Timed so the *last* element to arrive — the rule — still gets most of a
+  // second to sit. At the first pass it finished on frame 1126 of 1140, which
+  // is an arrival rather than a hold, the same mistake SameQuestion's lockup
+  // made. Work backwards from the end of the piece, not forwards from the cut.
+  const logo = eramp(t, 10, 44);
   const lines = [
-    { text: "Your campus.", p: eramp(t, 36, 58) },
-    { text: "Your people.", p: eramp(t, 48, 70) },
-    { text: "Your space.", p: eramp(t, 60, 82) },
+    { text: "Your campus.", p: eramp(t, 30, 52) },
+    { text: "Your people.", p: eramp(t, 40, 62) },
+    { text: "Your space.", p: eramp(t, 50, 72) },
   ];
-  const rule = eramp(t, 86, 106);
+  const rule = eramp(t, 74, 94);
 
   return (
     <AbsoluteFill

@@ -51,6 +51,7 @@
     "bed38": "node scripts/make-bed38.js",
     "screens": "node scripts/patch-screens.js",
     "probe-screens": "node scripts/probe-screens.js",
+    "probe-clip": "node scripts/probe-clip.js",
     "tour-board": "remotion still CampusTourBoard out/campus-tour-board.png",
     "same-board": "remotion still SameQuestionBoard out/same-question-board.png",
     "char-sheet": "remotion still CharacterSheet out/character-sheet.png",

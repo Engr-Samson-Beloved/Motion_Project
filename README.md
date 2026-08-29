@@ -742,6 +742,39 @@ screen rect. On a flat field that is exact; over a photograph it reads as a soft
 smear, which is still far less distracting than a black circle on someone's
 shoulder.
 
+### Screen recordings
+
+Stills are not the only option — `src/skng/tour/clip.tsx` takes video. A
+recording is the better source when it can be had: it carries the app's real
+scroll physics, its real transitions and a real thumb, none of which can be
+faked convincingly from a viewport still.
+
+```bash
+npm run probe-clip -- public/screens/scroll.mp4
+npm run probe-clip -- public/screens/scroll.mp4 --stills 0.5,2.25,4
+```
+
+There are two ways to use one, and choosing wrongly is the usual mistake:
+
+| | What you get | What it costs |
+|---|---|---|
+| **Play it** — `ScreenClip` | Real motion, real gestures | The recording's own timing, which will not land on the beat grid unless it happens to |
+| **Mine it** — `--stills` | Exact frames as PNGs, animated on the grid through `Device` and `Lens` | No live motion — but a recording holds *every* intermediate state, so it is a far richer source of stills than a screenshot session |
+
+**Prefer mining for anything cut to music; prefer playing for a single beat
+that is specifically about interaction.**
+
+`probe-clip` prints the `clip(...)` literal to paste, and warns when the source
+is not 30fps — Remotion resamples by timestamp so playback stays correct, but a
+60fps recording is contributing two source frames per rendered frame. Audio is
+muted unconditionally: a screen recording carries UI clicks and whatever the
+room sounded like, and the piece already has a bed.
+
+`crop` trims fractions off the top and bottom before scaling. A raw phone
+recording opens with the OS status bar — a real carrier, a real clock — and
+closes with the home indicator; dropped whole into a frame that already has its
+own chrome, that is two status bars.
+
 ## The working loop — script, storyboard, reference
 
 Three pieces exist because the feedback loop was wrong. Four full renders went into

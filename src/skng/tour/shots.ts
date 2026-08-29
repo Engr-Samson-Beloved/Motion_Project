@@ -194,22 +194,31 @@ export const WEB: readonly { x: number; y: number }[] = [
 export const WEB_WIDTH = 224;
 
 /**
- * Which pairs to wire, and when each line starts drawing.
+ * Which pairs to wire, and when each line starts drawing, in frames from
+ * `T.web`. Everything reaches the centre first, then the ring closes around
+ * it — the order is the point, so these are hand-ordered rather than
+ * generated.
  *
- * Everything reaches the centre first, then the ring closes around it — the
- * order is the point, so these are hand-ordered rather than generated.
+ * The whole sequence has to *finish* well before `T.lockup`. At the first
+ * pass the last edge completed on frame 1020 — the exact frame the lockup
+ * starts dissolving the constellation — so the shot the piece had spent four
+ * seconds building was never once on screen complete. Everything here is
+ * timed backwards from leaving 27 frames of finished mesh at the end.
  */
 export const WEB_EDGES: readonly { from: number; to: number; at: number }[] = [
-  { from: 6, to: 2, at: 26 },
-  { from: 6, to: 3, at: 32 },
-  { from: 6, to: 0, at: 40 },
-  { from: 6, to: 1, at: 46 },
-  { from: 6, to: 4, at: 54 },
-  { from: 6, to: 5, at: 60 },
-  { from: 0, to: 1, at: 66 },
-  { from: 0, to: 2, at: 70 },
-  { from: 1, to: 3, at: 74 },
-  { from: 2, to: 4, at: 78 },
-  { from: 3, to: 5, at: 82 },
-  { from: 4, to: 5, at: 86 },
+  { from: 6, to: 2, at: 30 },
+  { from: 6, to: 3, at: 34 },
+  { from: 6, to: 0, at: 38 },
+  { from: 6, to: 1, at: 42 },
+  { from: 6, to: 4, at: 46 },
+  { from: 6, to: 5, at: 50 },
+  { from: 0, to: 1, at: 54 },
+  { from: 0, to: 2, at: 57 },
+  { from: 1, to: 3, at: 60 },
+  { from: 2, to: 4, at: 63 },
+  { from: 3, to: 5, at: 66 },
+  { from: 4, to: 5, at: 69 },
 ] as const;
+
+/** How long one edge takes to draw. */
+export const WEB_DRAW = 24;
