@@ -1,7 +1,6 @@
 import "./index.css";
 import { Composition } from "remotion";
 import { CinemaProbe } from "./CinemaProbe";
-import { ClipProbe } from "./ClipProbe";
 import {
   CHARACTER_SHEET_HEIGHT,
   CHARACTER_SHEET_WIDTH,

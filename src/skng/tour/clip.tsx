@@ -117,6 +117,9 @@ export const ScreenClip: React.FC<ScreenClipProps> = ({
         overflow: "hidden",
         borderRadius: radius,
         border: outlined ? `2.5px solid ${TOUR.green}` : undefined,
+        // Without this the outline would add 5px to the box and shift the
+        // clip off the centre it was placed on.
+        boxSizing: "border-box",
         backgroundColor: TOUR.white,
         opacity,
       }}

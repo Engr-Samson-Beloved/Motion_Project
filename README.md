@@ -953,6 +953,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 |---|---|---|
 | `SkoolConnectStory` | `out/skoolconnect-story-90s.mp4` | h264 **1920x1080** 30fps, 2700 frames, 90.000s, AAC stereo, 37.9 MB |
 | `SameQuestion` | `out/same-question-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 9.6 MB |
+| `CampusTour` | `out/campus-tour-38s.mp4` | h264 1080x1920 30fps, 1140 frames, 38.000s, AAC stereo, 14.3 MB |
 | `CharacterLab` | `out/character-lab.mp4` | h264 1920x1080 30fps, 180 frames, 6.000s, 136 kB |
 | `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
