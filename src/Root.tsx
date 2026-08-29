@@ -8,6 +8,15 @@ import {
 } from "./CharacterSheet";
 import { CHARACTER_LAB_DURATION, CharacterLab } from "./CharacterLab";
 import {
+  CAMPUS_TOUR_DURATION,
+  CampusTour,
+} from "./skng/tour/CampusTour";
+import {
+  BOARD_HEIGHT as TOUR_BOARD_HEIGHT,
+  BOARD_WIDTH as TOUR_BOARD_WIDTH,
+  Board as CampusTourBoard,
+} from "./skng/tour/Board";
+import {
   SAME_QUESTION_DURATION,
   SameQuestion,
 } from "./skng/together/SameQuestion";
@@ -51,6 +60,29 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
+      />
+
+      {/*
+        Light-mode vertical product tour, 38s, built from captures of the live
+        app in public/screens/. The one piece that shows the real product.
+      */}
+      <Composition
+        id="CampusTour"
+        component={CampusTour}
+        durationInFrames={CAMPUS_TOUR_DURATION}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+
+      {/* Its contact sheet: fourteen sampled frames, one still. */}
+      <Composition
+        id="CampusTourBoard"
+        component={CampusTourBoard}
+        durationInFrames={1}
+        fps={30}
+        width={TOUR_BOARD_WIDTH}
+        height={TOUR_BOARD_HEIGHT}
       />
 
       {/*

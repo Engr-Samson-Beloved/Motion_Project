@@ -47,6 +47,7 @@ src/
     pulse/           Vertical 60s cut, beat-locked, built from product assets.
     story/           16:9 90s awareness film. Its own palette — see below.
     together/        9:16 30s character-led piece. No product UI.
+    tour/            9:16 38s light-mode product tour, from real captures.
     three/           3D scenes.
 public/
   skng-logo.png      The mark on its own. 512x512, 73% transparent.
@@ -54,14 +55,21 @@ public/
   bed.mp3            60s music bed at 100 BPM. Beat = 18 frames at 30fps.
   bed90.mp3          90s arranged bed at 120 BPM, for the story film.
   bed30.mp3          30s arranged bed at 120 BPM, for SameQuestion.
+  bed38.mp3          38s arranged bed at 120 BPM, for CampusTour.
   screens/           Captured app screens (gitignored). See its README.
+  screens/raw/       The untouched captures, before patch-screens.js.
 scripts/
   lib/synth.js       Deterministic music-bed synthesiser. Beds are arrangements.
+  lib/png.js         Minimal PNG decode/encode. Alpha boxes, colour probes, fills.
   measure-png.js     Alpha bounding box of a PNG, as canvas fractions.
   make-bed90.js      Arrangement for public/bed90.mp3.
   make-bed30.js      Arrangement for public/bed30.mp3.
+  make-bed38.js      Arrangement for public/bed38.mp3.
   vo-sheet.js        Voice-over cue sheet from src/skng/story/script.ts.
   capture-screens.js Screenshots the running app into public/screens/.
+  probe-screens.js   Geometry and colour of the captures, before using them.
+  patch-screens.js   Measures the screen inside each mockup; paints out the
+                     capture tool's floating widget. Run after any re-capture.
   restore-binaries.ps1  Undoes the file infector. Run before long renders.
   analyze-ref.js     Reference image/video analyzer. See "References" below.
 remotion.config.ts   Bundler + render settings.
@@ -544,6 +552,62 @@ npm run same-board        # eight sampled frames, one still
 npm run bed30             # regenerate public/bed30.mp3
 ```
 
+### CampusTour — 1080x1920, 1140 frames (38s)
+
+`src/skng/tour/`. The light-mode one, and the only piece that shows the real
+product: a vertical tour built from seven captures of the live app. The other
+two argue *for* SkoolConnectNG; this one simply is it, in its own colours.
+
+| Frames | Beat |
+|---|---|
+| 0–90 | A green line draws across an empty field and grows into a full-bleed green field |
+| 90–150 | "One app for your campus." The field collapses into the caption rule, and the first device rises |
+| 150–270 | **Explore** — the feed, pushed into the post |
+| 270–375 | **Discover** — the job card lifted onto a lens |
+| 375–480 | **People** — pushed into a Connect card |
+| 480–585 | **Connect** — the profile sheet, lens on the Connect button |
+| 585–690 | **Inbox** — lens on Chats / Connects / Communities / Activities |
+| 690–795 | **Communities** — pushed into a campus channel |
+| 795–900 | **Profile** — lens on the stats row |
+| 900–1020 | The row scatters into a connected constellation, all seven wired to the centre |
+| 1020–1140 | Lockup, then "Your campus. Your people. Your space." |
+
+Three ideas carry it, and each exists because of something the captures turned
+out to be.
+
+**The row.** Every capture is the same device at the same size, so they sit in
+a line one slot apart and the whole piece is one horizontal pan along it —
+nothing ever mounts or unmounts. `stripAt` sums one eased step per boundary
+into a single continuous camera position.
+
+**The green rule.** The opening field collapses into the small green rule above
+the captions and stays there for the next twenty-five seconds. One element the
+whole way through, so the caption furniture is never introduced — it is what is
+left of the title.
+
+**The lens.** A lens starts life exactly aligned with its own place on the
+screen, at the device's own scale, and grows from there. Identical pixels at
+progress 0 means no seam, and the motion reads as the detail being lifted out
+rather than as a panel appearing over the top.
+
+**The rail is load-bearing, not decoration.** A pan across a flat field is
+invisible — the phone is the only object, so it reads as one screen dissolving
+into the next. A hairline in world space with a node under each device gives the
+move something to move against. It is also the hard floor: no device and no lens
+may cross it, which is what keeps a push-in off its own caption. Before that
+clamp existed, Communities overlapped its own caption by 236px, because bringing
+a *high* focus region to the middle of the frame moves the device **down**.
+
+`shots.ts` holds the piece as data — the captures, their captions, the focus
+region on each, and `T`. Those boundaries are also the section boundaries in
+`scripts/make-bed38.js`; move one and move the other.
+
+```bash
+npm run screens           # patch the captures (do this first)
+npm run tour-board        # fourteen sampled frames, one still
+npm run bed38             # regenerate public/bed38.mp3
+```
+
 ## Character animation — `src/lib/character/`
 
 A jointed 2D rig, hand-built, no dependencies and no asset files.
@@ -637,6 +701,46 @@ swap, zoom and be masked, but a single card cannot fly out of it and connect to
 something else. Beats that need elements to come apart use the rebuilt
 components in `story/product.tsx`; beats that need to say "this is really the
 product" use a capture. The two are meant to be mixed in one film.
+
+### When the captures arrive as device mockups
+
+What actually arrived for `CampusTour` was not raw screenshots but seven
+rendered **iPhone mockups** of the live site — frame, bezel, baked drop shadow —
+at 804×1638 each. That changes three things, and none of them can be eyeballed:
+
+**Do not put them in the phone shell.** The artwork already contains the phone.
+`<Phone>` around a mockup is a phone inside a phone. The mockup is the element,
+and it moves as one.
+
+**They are viewport captures, so nothing scrolls.** Every file is exactly the
+same height, which means there is no page below the fold. `scrollRange()`
+returns nothing useful and the whole scroll machinery is dead weight. Detail has
+to come from magnification instead — which is where `tour/device.tsx`'s `Lens`
+came from.
+
+**They carry the capture tool's own widget.** A black disc near the right edge,
+same place on every shot, sitting *over* the app — covering a Connect button on
+one screen and crowding the close button on another. Shipping it would put a
+control in the film that does not exist in the product.
+
+```bash
+npm run probe-screens     # geometry and colour, before anything else
+npm run screens           # patch: locate the screen, paint the widget out
+```
+
+`patch-screens.js` keeps originals in `public/screens/raw/` and re-derives from
+them, so it is repeatable. Two things in it were measured rather than assumed,
+after both guesses failed:
+
+| Measurement | Why the obvious approach fails |
+|---|---|
+| The screen rect inside the frame | The device frame is light silver, so a luma threshold finds nothing. What separates frame from screen is a thin **black ring** — and the frame has a thin dark contour at its *outer* edge too, so the first dark run inward is the wrong one. Taking it put the screen edge at x=8 and gave an aspect of 0.494, where this device's screen is 0.461 |
+| The widget disc | A fixed search window reached the bezel and grew the disc from 40px to 110px, so the fill spilled over the frame. Flood-filling the dark region from a seed cannot do that |
+
+The fill is inverse-distance blending of four boundary samples, clamped to the
+screen rect. On a flat field that is exact; over a photograph it reads as a soft
+smear, which is still far less distracting than a black circle on someone's
+shoulder.
 
 ## The working loop — script, storyboard, reference
 
