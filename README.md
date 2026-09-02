@@ -32,7 +32,10 @@ should feel like it has mass — entrances, pops, slides.
 ```
 src/
   index.ts           Entry point. Hands Root.tsx to Remotion. Never needs editing.
-  Root.tsx           Registers every composition: size, fps, duration, default props.
+  registry.ts        Every composition declared once: size, fps, duration, default
+                     props, and the gallery's title, blurb and poster frame.
+                     Adding a piece here registers it everywhere. Start here.
+  Root.tsx           Maps the registry into <Composition> tags for the CLI.
   WelcomeScreen.tsx  5s welcome title card.
   TextMotion.tsx     4s text reveal.
   LowerThird.tsx     3s broadcast name tag.
@@ -48,6 +51,12 @@ src/
     story/           16:9 90s awareness film. Its own palette — see below.
     together/        9:16 30s character-led piece. No product UI.
     tour/            9:16 38s light-mode product tour, from real captures.
+    install/         9:16 36s "Add to Home Screen" explainer. iOS drawn, not
+                     captured: chrome, share sheet, keyboard, home screen.
+    month/           9:16 16s monthly post, plus its still. Re-pointed by one
+                     constant; the calendar is computed, not typeset.
+    update/          9:16 30s monthly community update. Light. The member
+                     count drawn as that many countable dots.
     three/           3D scenes.
 public/
   skng-logo.png      The mark on its own. 512x512, 73% transparent.
@@ -56,8 +65,13 @@ public/
   bed90.mp3          90s arranged bed at 120 BPM, for the story film.
   bed30.mp3          30s arranged bed at 120 BPM, for SameQuestion.
   bed38.mp3          38s arranged bed at 120 BPM, for CampusTour.
+  bed36.mp3          36s arranged bed at 120 BPM, for AddToHome.
+  bed16.mp3          16s arranged bed at 120 BPM, for NewMonth.
+  bed-update.mp3     30s arranged bed at 120 BPM, for MonthlyUpdate. Named for
+                     the piece because bed30.mp3 is SameQuestion's.
   screens/           Captured app screens (gitignored). See its README.
-  screens/raw/       The untouched captures, before patch-screens.js.
+  screens/raw/       Untouched captures before patch-screens.js, and any
+                     supplied reference art. The two install posters live here.
 scripts/
   lib/synth.js       Deterministic music-bed synthesiser. Beds are arrangements.
   lib/png.js         Minimal PNG decode/encode. Alpha boxes, colour probes, fills.
@@ -65,6 +79,7 @@ scripts/
   make-bed90.js      Arrangement for public/bed90.mp3.
   make-bed30.js      Arrangement for public/bed30.mp3.
   make-bed38.js      Arrangement for public/bed38.mp3.
+  make-bed36.js      Arrangement for public/bed36.mp3.
   vo-sheet.js        Voice-over cue sheet from src/skng/story/script.ts.
   capture-screens.js Screenshots the running app into public/screens/.
   probe-screens.js   Geometry and colour of the captures, before using them.
@@ -72,10 +87,19 @@ scripts/
                      capture tool's floating widget. Run after any re-capture.
   restore-binaries.ps1  Undoes the file infector. Run before long renders.
   analyze-ref.js     Reference image/video analyzer. See "References" below.
+  check-assets.js    Fails the build if a bed or a logo is missing from public/.
+web/
+  index.html         Shell for the gallery app.
+  main.tsx           Mounts it.
+  app.tsx            The gallery grid, and a detail page per composition.
+  styles.css         Its styling, on the story film's dark palette.
 remotion.config.ts   Bundler + render settings.
+vite.config.mts      The gallery's build. Points publicDir at public/, so
+                     staticFile() resolves to the same files the CLI sees.
+vercel.json          Static deploy, plus the SPA fallback for /c/<id>.
 ```
 
-`Root.tsx` is the spec sheet — change a video's dimensions or length there. The
+`registry.ts` is the spec sheet — change a video's dimensions or length there. The
 component files are the artwork — change how things look and move there.
 
 ## Compositions
@@ -147,8 +171,70 @@ editing code.
 ### Before committing
 
 ```bash
-npm run lint     # eslint + tsc
+npm run lint     # eslint + tsc, across src/ and web/
 ```
+
+### The gallery — `web/`
+
+Studio is the authoring loop and needs a terminal. The gallery is the same
+compositions on a URL, for everyone who does not have the repo:
+
+```bash
+npm run web       # vite dev server, localhost:5173
+npm run build     # check-assets, then a static build into dist/
+npm run preview   # serve that build, localhost:4173
+```
+
+It is a Vite SPA rather than Next.js because every part of it is browser-only —
+`@remotion/player` scrubs in the browser, and nothing here needs a server to
+render. `publicDir` points at this repo's `public/`, which is what makes the
+compositions work unchanged: with no `remotion_staticBase` set, `staticFile()`
+returns `/bed90.mp3`, and that is exactly where Vite serves it.
+
+Three things worth knowing before editing it:
+
+**One registry, two consumers.** `src/registry.ts` is read by `Root.tsx` for the
+CLI and by `web/app.tsx` for the gallery. Before it existed the list was twenty-
+one hand-written tags in `Root.tsx`, which was fine with one consumer and is not
+with two — a second hand-kept copy drifts, and the drift shows up as a piece
+that renders locally and is missing from the deployed page.
+
+**`CinemaProbe` is lazy, and has to be.** It is the only composition that pulls
+in three.js and `@react-three/postprocessing`, which is two thirds of the app's
+JavaScript for a rig the README calls "not a deliverable". It uses Remotion's
+`lazyComponent` rather than `React.lazy`: the CLI awaits `lazyComponent` before
+starting a render pass, where a suspended subtree *during* a pass yields blank
+frames and a green exit code. Splitting it took the first load from 474 kB
+gzipped to 209 kB.
+
+**`npm run build` is the gallery now**, not `remotion bundle`. That moved to
+`npm run bundle`. `build` first runs `scripts/check-assets.js`, which exists
+because of a specific way this project breaks: the beds are generated into
+`public/` by `make-bed*.js`, so it is entirely possible to render a piece
+locally, be happy with it, and commit everything except the bed it depends on.
+Nothing fails — `tsc` passes, the CLI renders, Studio plays — and the first sign
+of trouble is a deployed page playing a film in silence. `staticFile()` is a
+runtime lookup, so only a build-time check can catch it.
+
+`CampusTour` is built from `public/screens/`, which is gitignored on purpose:
+large, stale quickly, may hold real user data. It renders in the gallery with
+its sources missing, and the detail page says so rather than showing an
+unexplained blank device.
+
+### Deploying
+
+`vercel.json` is set up for a static deploy: `npm run build` into `dist/`, with
+a rewrite so `/c/SkoolConnectStory` serves the app rather than 404ing. Nothing
+renders server-side, so the Hobby tier is enough and there is no ffmpeg, no
+headless Chrome and no function timeout in the picture.
+
+Two things are unresolved and should be before the URL is public:
+
+- **The Remotion licence.** `@remotion/player` asks for acknowledgement, and
+  browser-side rendering (`@remotion/web-renderer`, already installed) takes a
+  `licenseKey`. Check whether this use needs a company licence.
+- **`public/screens/`.** Either commit the patched captures or keep
+  `CampusTour` marked as local-only. Right now it deploys incomplete.
 
 ## Tuning guide
 
@@ -608,6 +694,218 @@ npm run tour-board        # fourteen sampled frames, one still
 npm run bed38             # regenerate public/bed38.mp3
 ```
 
+### AddToHome — 1080x1920, 1080 frames (36s)
+
+`src/skng/install/`. How to install SkoolConnectNG on an iPhone, demonstrated
+rather than diagrammed. The supplied reference art in `public/screens/raw/`
+(`1.jpg` portrait, `2.jpg` landscape) lays the procedure out as five phones in
+a row — the right shape for a poster and the wrong one for a film. Five frozen
+states leave every transition to the reader, and the transitions are exactly
+what a first-time user is unsure about: where the sheet comes from, how far to
+scroll, what happens after Add. So this is **one phone, held for all thirty-six
+seconds**, with the flow performed inside it.
+
+| Frames | Beat |
+|---|---|
+| 0–150 | "Add SkoolConnectNG to your iPhone Home Screen." The step rail draws; the phone rises under the title |
+| 150–300 | **1** — Safari on skoolconnectng.com. The pointer crosses to the Share button and presses it |
+| 300–450 | **2** — the share sheet rises. Header, share targets, the action list |
+| 450–600 | **3** — the pointer drags the list up and taps **Add to Home Screen** |
+| 600–750 | **4** — the Add sheet: icon, name field, keyboard. Ring on **Add**, press |
+| 750–900 | **5** — the browser collapses into the icon's slot; the icon flies to the grid and lands |
+| 900–1080 | Lockup, "Simple. Fast. Yours.", and the address |
+
+**iOS is drawn, not captured.** `ios.tsx` builds the status bar, address bar,
+toolbar, share sheet, Add sheet, keyboard, wallpaper, dock and icon grid from
+nothing. Everything in it is laid out in **iOS points against a 390x844 screen**
+and scaled exactly once, at the screen boundary, by `PT` — which is the only
+reason the numbers in that file can be Apple's real ones (a 54pt status bar, a
+60pt icon, a 291pt keyboard). Written in output pixels instead, every one of
+them becomes an arbitrary constant no later reader can check.
+
+Drawing it was not a preference. The reference renders each step at about 180px
+wide, which is a diagram of the UI rather than a source for one at 1080p; and
+the captures in `public/screens/` are device mockups with a phone already inside
+them, so compositing one here would put a phone inside a phone.
+
+**The green stays outside the glass.** Everything the *film* says — the ring,
+the pointer, the step rail, the caption — is the brand's. Everything the *phone*
+says is Apple's greys and Apple's blue. The line is never crossed, and the ring
+is always drawn *outside* the control it marks, never as a fill on it. A green
+Add button would look better on a poster and would teach the viewer something
+false: they would go looking for it on their own phone and not find it.
+
+**No handheld camera** — the only piece in `skng/` without one. The others are
+built from shapes and photographs, which a sub-pixel drift flatters. This one is
+built from hairlines and 13pt UI text, and the viewer is being asked to *read*
+it. Grain is 0.05 and aberration is 0, for the same reason.
+
+**One number, three animations.** The sheet's position, the pointer's target and
+the ring's box all come from the same value in `AddToHome.tsx` rather than each
+being animated where it is drawn. Let them drift by a frame and the press lands
+next to the control instead of on it, which is the tell that the whole
+interaction was faked.
+
+`script.ts` holds the piece as data: the timeline, the caption copy, the
+pointer's path, and the boxes the ring marks. Every block is exactly 150 frames
+— ten beats at 120 BPM — and those boundaries are the section boundaries in
+`scripts/make-bed36.js`; move one and move the other.
+
+```bash
+npm run install-board     # eighteen sampled frames, one still
+npm run bed36             # regenerate public/bed36.mp3
+```
+
+**The master is 39 MB, which is too big to send.** Fine grain over fine UI
+detail is expensive to encode — the film is mostly hairlines and 13pt type, and
+h264 spends its bitrate on exactly that. WhatsApp caps a status video at 16 MB
+and this is the one piece in the repo most likely to be sent that way, so keep
+a share copy beside the master:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -y \
+  -i out/add-to-home-36s.mp4 -c:v libx264 -crf 28 -preset slow \
+  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart \
+  out/add-to-home-36s-share.mp4      # 2.1 MB
+```
+
+### NewMonth — 1080x1920, 480 frames (16s), and MonthPoster — 1080x1920 still
+
+The monthly post. `src/skng/month/`.
+
+| Frames | Beat |
+|---|---|
+| 0–130 | The ground and its seven-column measure draw in. `08` sits, then rolls to `09`; AUGUST passes SEPTEMBER beneath it on the same frames |
+| 130–296 | The numerals shrink into a badge with the year; SEPTEMBER sets letter by letter; the plate arrives and a real September 2026 grid cascades in, week by week, with a green chip on the 1st |
+| 296–400 | The grid clears and the line lands **in the same plate**: RESUMPTION SEASON / "New session, new faces." / "Find your people before you find your seat." |
+| 400–480 | The mark, a green rule, SEPTEMBER 2026, `skoolconnectng.com` |
+
+**The month is one constant.** `THIS_MONTH` in `script.ts` is `{ year, month }`
+and everything follows from it — the grid, both sets of numerals, the previous
+month's name, and the copy (`VOICE[month]`, falling back to a neutral default
+for months with nothing specific to say). To ship October, change that line.
+Nothing else moves, and there is no month in which someone has to re-check what
+weekday the 1st falls on.
+
+The calendar is computed **in UTC**. `new Date(2026, 8, 1)` is local time, and
+on a render machine west of Greenwich that is the 31st of August — which would
+shift the whole grid by a day, silently, and only for some of the people
+running the render.
+
+The plate is sized from the row count rather than fixed. A 31-day month opening
+on a Sunday needs six rows; hard-coding five would clip that month's last week,
+in that month only, which is exactly the kind of bug that ships.
+
+Two decisions worth keeping:
+
+**The number is the transition, the word is the subject.** A month post that
+opens on its own answer has nothing to play. A still can say which month it is;
+only motion can say a month has *changed*, and that is the actual occasion. The
+roll is 28 frames, not 34 — a flat odometer spends its middle showing half the
+old figure above half the new one, which is legible on a small wheel and reads
+as a broken glyph at 400px. The fix is to spend less time there.
+
+**One plate, two contents.** The calendar and the line occupy the same panel and
+the panel never moves. The frame is not rebuilt between them; what is inside a
+fixed shape is swapped. Without that the copy arrives unrelated to the grid it
+replaced and the piece reads as two posts spliced together.
+
+No camera, for the same reason `install/` has none but arrived at differently:
+that piece was full of hairlines and 13pt UI text, this one is a poster built on
+a *visible* seven-column measure, and drift on a grid reads as a wobble.
+
+`MonthPoster` is the same month standing still — not a frame grabbed from the
+film. The film's plate holds the calendar and then the line, one after the
+other, which is a thing only motion can do; the still has to show both at once,
+so the line moves below the plate and the mark comes down to the foot. Both are
+driven by feeding the same components a frame past every ramp in them, so there
+is one code path and two outputs.
+
+```bash
+npm run bed16          # public/bed16.mp3, before the first render
+npx remotion render NewMonth out/september-2026.mp4
+npm run month-poster   # out/september-2026-poster.png
+```
+
+The master is 12.9 MB, already inside WhatsApp's 16 MB status cap, but this
+piece goes out to students on mobile data. A CRF-28 copy is 0.76 MB and
+indistinguishable at phone size:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -y \
+  -i out/september-2026.mp4 -c:v libx264 -crf 28 -preset slow \
+  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart \
+  out/september-2026-share.mp4      # 0.76 MB
+```
+
+### MonthlyUpdate — 1080x1920, 900 frames (30s)
+
+The monthly community update. `src/skng/update/`. Light, where `NewMonth` is
+dark — that piece is a poster and wants presence, this one is closer to a page.
+
+| Frames | Beat |
+|---|---|
+| 0–210 | Welcome to September. The badge, the word, a green rule, MONTHLY UPDATE at the foot |
+| 210–530 | GOOD NEWS. The counter runs 0 → 300 while 300 dots fill in with it, then `+` arrives; "students on SkoolConnectNG." |
+| 530–690 | Three empty rows fade in under the grid. "The space is still fresh." / "You're early, not late." |
+| 690–810 | The 301st dot — the viewer's — lands in the first empty slot and a ring is drawn round it. "Build your profile." |
+| 810–900 | The mark, a green rule, `skoolconnectng.com` |
+
+**The brief contains a real tension and the piece is built on it.** "300+ users"
+is a boast; "the space is still fresh" admits the network is small. Post only
+the first and it sounds like a bigger platform pretending; post only the second
+and it sounds like an empty one apologising. Said together — three hundred
+countable dots, three empty rows underneath — "small" becomes "early", which is
+the only thing a student deciding whether to bother actually wants to know.
+
+Three decisions carry it:
+
+**The number is drawn, not just written.** 20 x 15 is exactly 300, which is the
+whole reason the grid is that shape: the claim on screen is countable. A field
+of roughly-that-many dots would have been easier to lay out and would have
+turned a fact into a decoration.
+
+**The counter and the grid run off one ramp.** They are the same fact stated
+twice, and a counter that lands before its dots makes them two. The fill is
+driven `DOT_RAMP` *past* the last index — ramping to exactly 300 leaves the
+final six dots permanently part-scaled, so the corner of a grid that is meant
+to read as exactly three hundred tapers off. The counter clamps at 300 anyway.
+
+**The empty rows fade out downward instead of being closed off.** A bounded
+grid would read as capacity — 300 of 360, nearly full — which is the opposite
+of the sentence they exist to illustrate.
+
+The call to action is not a button drawn on a poster nobody can press; it is
+the 301st dot arriving in the first slot that was empty, which is literally
+what building a profile does.
+
+`COUNT` must stay a multiple of the column count or the last row comes out
+short and stops matching the number above it. The next honest numbers to ship
+this at are 320, 340, 360. The month comes from `month/script.ts`, so both
+pieces name the same month from one source.
+
+Light grade, following `tour/`: grain only, no bloom and no vignette — on a
+near-white ground the dark pieces' settings read as a dirty print. No camera,
+for the reason `month/` has none: the frame is a twenty-column grid of 16px
+dots and handheld drift on a grid reads as a wobble.
+
+```bash
+npm run bed-update     # public/bed-update.mp3, before the first render
+npx remotion render MonthlyUpdate out/september-update-30s.mp4
+```
+
+**The master is 44.7 MB** — far heavier than the dark pieces, because grain
+over a large near-white field is high-frequency detail everywhere and h264
+spends its bitrate on exactly that. Well over WhatsApp's 16 MB status cap, so
+keep a share copy:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -y \
+  -i out/september-update-30s.mp4 -c:v libx264 -crf 28 -preset slow \
+  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart \
+  out/september-update-30s-share.mp4      # 1.0 MB
+```
+
 ## Character animation — `src/lib/character/`
 
 A jointed 2D rig, hand-built, no dependencies and no asset files.
@@ -954,6 +1252,10 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 | `SkoolConnectStory` | `out/skoolconnect-story-90s.mp4` | h264 **1920x1080** 30fps, 2700 frames, 90.000s, AAC stereo, 37.9 MB |
 | `SameQuestion` | `out/same-question-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 9.6 MB |
 | `CampusTour` | `out/campus-tour-38s.mp4` | h264 1080x1920 30fps, 1140 frames, 38.000s, AAC stereo, 14.3 MB |
+| `AddToHome` | `out/add-to-home-36s.mp4` | h264 1080x1920 30fps, 1080 frames, 36.000s, AAC stereo, 39.2 MB |
+| `NewMonth` | `out/september-2026.mp4` | h264 1080x1920 30fps, 480 frames, 16.000s, AAC stereo, 12.9 MB |
+| `MonthPoster` | `out/september-2026-poster.png` | 1080x1920 still, 2.3 MB |
+| `MonthlyUpdate` | `out/september-update-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 44.7 MB |
 | `CharacterLab` | `out/character-lab.mp4` | h264 1920x1080 30fps, 180 frames, 6.000s, 136 kB |
 | `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |
