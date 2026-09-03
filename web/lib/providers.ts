@@ -28,25 +28,24 @@ export type Provider = {
   id: ProviderId;
   label: string;
   defaultModel: string;
-  /** Available tested models for convenient selection */
-  models?: readonly string[];
   /** Where to get a key, shown under the field. */
   keyHint: string;
   /** Only the OpenAI-compatible entry needs one typed in. */
   needsBaseUrl: boolean;
 };
 
+/**
+ * `defaultModel` is a starting point, not a claim. Model names go stale faster
+ * than anything else in this file — a hardcoded list is wrong within weeks, and
+ * the failure it produces is a 404 that reads like a broken key. `listModels`
+ * below asks the provider what it actually serves, which is the only version of
+ * this that stays true.
+ */
 export const PROVIDERS: readonly Provider[] = [
   {
     id: "google",
     label: "Google Gemini",
     defaultModel: "gemini-3.5-flash",
-    models: [
-      "gemini-3.5-flash",
-      "gemini-3.6-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-3-flash-preview",
-    ],
     keyHint: "aistudio.google.com → Get API key",
     needsBaseUrl: false,
   },
@@ -54,12 +53,6 @@ export const PROVIDERS: readonly Provider[] = [
     id: "groq",
     label: "Groq",
     defaultModel: "openai/gpt-oss-120b",
-    models: [
-      "openai/gpt-oss-120b",
-      "openai/gpt-oss-20b",
-      "qwen/qwen3.8-27b",
-      "groq/compound",
-    ],
     keyHint: "console.groq.com → API keys",
     needsBaseUrl: false,
   },
@@ -67,7 +60,6 @@ export const PROVIDERS: readonly Provider[] = [
     id: "anthropic",
     label: "Anthropic",
     defaultModel: "claude-opus-5",
-    models: ["claude-opus-5", "claude-sonnet-4"],
     keyHint: "console.anthropic.com → API keys",
     needsBaseUrl: false,
   },
@@ -75,7 +67,6 @@ export const PROVIDERS: readonly Provider[] = [
     id: "openai",
     label: "OpenAI",
     defaultModel: "gpt-5.1",
-    models: ["gpt-5.1", "gpt-5-mini"],
     keyHint: "platform.openai.com → API keys",
     needsBaseUrl: false,
   },
@@ -319,6 +310,99 @@ export const generateComposition = async (
         "The endpoint",
       );
     }
+    default:
+      throw new Error(`Unknown provider: ${String(credentials.provider)}`);
+  }
+};
+
+/* --------------------------------------------------- listing what is there */
+
+/**
+ * Model ids that are real but useless here — speech, embeddings, image and
+ * safety-classifier endpoints that appear in the same list as the text models.
+ * Excluded so the picker shows things that can actually write a composition.
+ */
+const NOT_TEXT =
+  /whisper|tts|transcribe|embedding|guard|moderation|orpheus|lyria|-image|image-|robotics|computer-use/i;
+
+const sortModels = (ids: string[]) =>
+  [...new Set(ids)].filter((id) => !NOT_TEXT.test(id)).sort();
+
+const listOpenAiShaped = async (
+  credentials: Credentials,
+  baseUrl: string,
+  label: string,
+) => {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/models`, {
+    headers: { authorization: `Bearer ${credentials.apiKey}` },
+  });
+  if (!response.ok) {
+    throw await httpError(response, label);
+  }
+  const body = (await response.json()) as { data?: { id?: string }[] };
+  return sortModels((body.data ?? []).map((m) => m.id ?? ""));
+};
+
+/**
+ * Asks the provider what it serves. This is also the key test: a 401 here is
+ * an unambiguous "the key is wrong", told in one click instead of being
+ * inferred from a failed generation.
+ */
+export const listModels = async (
+  credentials: Credentials,
+): Promise<string[]> => {
+  if (!credentials.apiKey.trim()) {
+    throw new Error("Add an API key first.");
+  }
+
+  switch (credentials.provider) {
+    case "anthropic": {
+      const client = new Anthropic({
+        apiKey: credentials.apiKey,
+        dangerouslyAllowBrowser: true,
+      });
+      const page = await client.models.list({ limit: 100 });
+      return sortModels(page.data.map((m) => m.id));
+    }
+
+    case "openai":
+      return listOpenAiShaped(credentials, "https://api.openai.com/v1", "OpenAI");
+
+    case "groq":
+      return listOpenAiShaped(
+        credentials,
+        "https://api.groq.com/openai/v1",
+        "Groq",
+      );
+
+    case "google": {
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",
+        { headers: { "x-goog-api-key": credentials.apiKey } },
+      );
+      if (!response.ok) {
+        throw await httpError(response, "Google");
+      }
+      const body = (await response.json()) as {
+        models?: { name?: string; supportedGenerationMethods?: string[] }[];
+      };
+      return sortModels(
+        (body.models ?? [])
+          // Only the ones that can answer a prompt at all.
+          .filter((m) =>
+            (m.supportedGenerationMethods ?? []).includes("generateContent"),
+          )
+          .map((m) => (m.name ?? "").replace(/^models\//, "")),
+      );
+    }
+
+    case "compatible": {
+      if (!credentials.baseUrl.trim()) {
+        throw new Error("Add the base URL for the compatible endpoint.");
+      }
+      return listOpenAiShaped(credentials, credentials.baseUrl, "The endpoint");
+    }
+
     default:
       throw new Error(`Unknown provider: ${String(credentials.provider)}`);
   }

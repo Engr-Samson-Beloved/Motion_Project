@@ -13,6 +13,7 @@ import {
   PROVIDERS,
   clearCredentials,
   generateComposition,
+  listModels,
   loadCredentials,
   saveCredentials,
   type Credentials,
@@ -56,6 +57,36 @@ const SettingsPanel: FC<{
   onClose: () => void;
 }> = ({ credentials, onChange, onClose }) => {
   const provider = PROVIDERS.find((p) => p.id === credentials.provider);
+
+  const [models, setModels] = useState<string[] | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | null>(null);
+
+  // A model list belongs to one key on one provider. Drop it whenever either
+  // changes, or the picker offers models the new key cannot reach.
+  useEffect(() => {
+    setModels(null);
+    setCheckError(null);
+  }, [credentials.provider, credentials.apiKey, credentials.baseUrl]);
+
+  const check = async () => {
+    setChecking(true);
+    setCheckError(null);
+    try {
+      const found = await listModels(credentials);
+      setModels(found);
+      // If the current model is not one this key can reach, the generation
+      // would 404 with a message that reads like a bad key. Move to something
+      // real instead, and say so by just changing the field.
+      if (found.length > 0 && !found.includes(credentials.model)) {
+        onChange({ ...credentials, model: found[0] });
+      }
+    } catch (error) {
+      setCheckError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <div className="sheet" role="dialog" aria-label="API key">
@@ -109,26 +140,6 @@ const SettingsPanel: FC<{
       ) : null}
 
       <label className="field">
-        <span>Model</span>
-        <input
-          type="text"
-          list="model-suggestions"
-          placeholder="Select or enter model name"
-          value={credentials.model}
-          onChange={(event) =>
-            onChange({ ...credentials, model: event.target.value })
-          }
-        />
-        {provider?.models && provider.models.length > 0 ? (
-          <datalist id="model-suggestions">
-            {provider.models.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
-        ) : null}
-      </label>
-
-      <label className="field">
         <span>API key</span>
         <input
           type="password"
@@ -141,6 +152,56 @@ const SettingsPanel: FC<{
           }
         />
         <small>{provider?.keyHint}</small>
+      </label>
+
+      <div className="check-row">
+        <button
+          type="button"
+          className="ghost"
+          disabled={checking || !credentials.apiKey.trim()}
+          onClick={() => void check()}
+        >
+          {checking ? "Checking…" : "Test key & list models"}
+        </button>
+        {models ? (
+          <span className="check-ok">
+            Key works — {models.length} model{models.length === 1 ? "" : "s"}
+          </span>
+        ) : null}
+      </div>
+
+      {checkError ? <p className="check-error">{checkError}</p> : null}
+
+      <label className="field">
+        <span>Model</span>
+        {models && models.length > 0 ? (
+          <select
+            value={credentials.model}
+            onChange={(event) =>
+              onChange({ ...credentials, model: event.target.value })
+            }
+          >
+            {models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            placeholder="Model name"
+            value={credentials.model}
+            onChange={(event) =>
+              onChange({ ...credentials, model: event.target.value })
+            }
+          />
+        )}
+        <small>
+          {models
+            ? "Live from the provider — these are the ones this key can reach."
+            : "Test the key to replace this with the models it can actually reach."}
+        </small>
       </label>
 
       <div className="sheet-actions">
