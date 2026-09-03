@@ -13,6 +13,10 @@ refs/*
 !refs/README.md
 !refs/*.json
 
-# Captured app screens: large, stale quickly, may hold real user data.
-public/screens/*
-!public/screens/README.md
+# Captured app screens were kept out of the repo while they were only ever
+# needed on the machine that captured them. CampusTour is built from them, so a
+# deployed build needs them too, and they are now tracked.
+#
+# The reason they were ignored has not stopped being true: they are large, they
+# go stale quickly, and a capture of a signed-in session can carry real user
+# data. Look at a new capture before adding it.

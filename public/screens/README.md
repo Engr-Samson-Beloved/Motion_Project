@@ -47,6 +47,21 @@ Animate them with `src/skng/story/screens.tsx` — `ScreenShot`, `scrollAt`,
 before animating a scroll: a capture only slightly taller than the screen gives
 a few dozen pixels of travel, which reads as a glitch rather than as a scroll.
 
+## Reference art (`raw/1.jpg`, `raw/2.jpg`)
+
+Supplied designs rather than captures: the "Add SkoolConnectNG to Your iPhone
+Home Screen" posters, portrait and landscape. They are the source for
+`src/skng/install/` — its copy, its five steps and its colours all come from
+them — but not a source of *pixels*. Each poster renders a step at roughly
+180px wide, which is a diagram of the UI, not artwork for a 1080p frame, so
+`install/ios.tsx` redraws every one of those screens from scratch.
+
+**They also displaced what `raw/` is for.** Nothing else is in there now, so
+the seven mockups in this folder no longer have untouched originals behind
+them. `npm run screens` re-derives from `raw/`, and on a fresh run it will
+adopt the current — already patched — PNGs as the originals. Re-capture before
+running it again rather than patching a patch.
+
 ## Both kinds
 
 A screenshot is one flat bitmap. It can scroll, hold, swap, zoom and be masked,
