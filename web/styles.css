@@ -689,6 +689,47 @@ code {
   border-color: var(--green);
 }
 
+.axis-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.axis-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.swatches {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.swatches > span {
+  width: 14px;
+  height: 20px;
+  display: block;
+}
+
+.axis-warn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--warn);
+  background: var(--surface-2);
+  border-left: 2px solid var(--warn);
+  padding: 10px 12px;
+  border-radius: 3px;
+}
+
 .composer-actions {
   display: flex;
   gap: 8px;

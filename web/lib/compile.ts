@@ -25,11 +25,15 @@ import * as MediaUtils from "@remotion/media-utils";
 
 import * as Cinema from "../../src/lib/cinema";
 import * as Character from "../../src/lib/character";
-import * as Brand from "../../src/skng/brand";
-import * as StoryPalette from "../../src/skng/story/palette";
+import * as Motion from "../../src/skng/story/palette";
+
+import { brandModule, type BrandProfile } from "./brand";
+import { directionModule, type Direction } from "./direction";
+import { isDark } from "./brand";
+import { makeStageModule } from "./stage";
 
 /**
- * What generated code may import.
+ * The modules that are the same whatever brand is active.
  *
  * `@remotion/transitions` and `@remotion/shapes` are deliberately absent. Both
  * draw through Remotion's HTML-in-Canvas, which Chrome keeps behind
@@ -38,7 +42,7 @@ import * as StoryPalette from "../../src/skng/story/palette";
  * model write a composition that typechecks, compiles, previews black, and
  * gives no clue why.
  */
-const MODULES: Readonly<Record<string, unknown>> = {
+const FIXED_MODULES: Readonly<Record<string, unknown>> = {
   react: React,
   "react/jsx-runtime": JsxRuntime,
   remotion: Remotion,
@@ -49,11 +53,39 @@ const MODULES: Readonly<Record<string, unknown>> = {
   "@remotion/media-utils": MediaUtils,
   "@/cinema": Cinema,
   "@/character": Character,
-  "@/brand": Brand,
-  "@/palette": StoryPalette,
+  // Easing and ramp helpers. These were in the story film's palette module and
+  // are pure timing maths — nothing brand-specific about them.
+  "@/motion": {
+    ramp: Motion.ramp,
+    eramp: Motion.eramp,
+    ease: Motion.ease,
+    sceneFade: Motion.sceneFade,
+  },
 };
 
-export const AVAILABLE_MODULES = Object.keys(MODULES);
+/**
+ * The three that change with the brand and the direction.
+ *
+ * This is the seam the whole strategy turns on. A model told to "use #165538 for
+ * headings" drifts — it paraphrases hex codes, invents near-misses, and has
+ * forgotten by line 200. A model told to `import {BRAND} from "@/brand"` cannot
+ * drift, because the values never appear in its output at all. The brand becomes
+ * unforgeable rather than merely requested, and the same generated source
+ * re-renders as any other brand by swapping what this function returns.
+ */
+export const modulesFor = (brand: BrandProfile, direction: Direction) => ({
+  ...FIXED_MODULES,
+  "@/brand": brandModule(brand),
+  "@/direction": directionModule(direction, isDark(brand)),
+  "@/stage": makeStageModule(brand, direction),
+});
+
+export const AVAILABLE_MODULES = [
+  ...Object.keys(FIXED_MODULES),
+  "@/brand",
+  "@/direction",
+  "@/stage",
+];
 
 export type CompositionConfig = {
   width: number;
@@ -117,8 +149,13 @@ export const stripCodeFence = (source: string) => {
   return match ? match[1] : source;
 };
 
-export const compileComposition = (rawSource: string): CompileResult => {
+export const compileComposition = (
+  rawSource: string,
+  brand: BrandProfile,
+  direction: Direction,
+): CompileResult => {
   const source = stripCodeFence(rawSource);
+  const modules = modulesFor(brand, direction);
 
   let code: string;
   try {
@@ -133,8 +170,8 @@ export const compileComposition = (rawSource: string): CompileResult => {
 
   const moduleObject = { exports: {} as Record<string, unknown> };
   const requireShim = (name: string) => {
-    if (Object.prototype.hasOwnProperty.call(MODULES, name)) {
-      return MODULES[name];
+    if (Object.prototype.hasOwnProperty.call(modules, name)) {
+      return modules[name as keyof typeof modules];
     }
     throw new Error(
       `Cannot import "${name}". This composition runs in the browser with a ` +

@@ -7,35 +7,42 @@
  * Sucrase's transform, the `require` shim, the module map, and the handoff to
  * `<Player>` — exercised without spending a token.
  *
- * It is also the concrete answer to "what does good look like here", so keep it
- * honest: real timing constants at the top, comments about why rather than
- * what, and cuts that land on the beat.
+ * Note what it does not contain: a single colour literal, a font name, or a
+ * grade setting. Switch the brand or the direction in the picker and this same
+ * source re-renders as a different client, in a different treatment. That is
+ * the whole argument for the split, demonstrated in one file.
  */
 
 export const EXAMPLE_NAME = "Orientation Week";
 
-export const EXAMPLE_SOURCE = `import {AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring} from "remotion";
-import {STORY, HEADING_FONT, BODY_FONT, MONO_FONT, HEADING_TRACKING, eramp} from "@/palette";
+export const EXAMPLE_SOURCE = `import {useCurrentFrame, useVideoConfig, interpolate, spring, AbsoluteFill} from "remotion";
+import {Stage, Kicker, Heading, Body, Rule} from "@/stage";
+import {DIRECTION} from "@/direction";
+import {eramp} from "@/motion";
 
 export const config = {width: 1080, height: 1920, fps: 30, durationInFrames: 300};
 
-// 120 BPM at 30fps is exactly 15 frames per beat, so every constant below is a
-// whole number of beats and no cut lands "nearly" on the music.
-const BEAT = 15;
+// Every constant below is a whole number of beats, so no cut lands "nearly" on
+// the music. DIRECTION.beat is the frames-per-beat for this treatment.
+const B = DIRECTION.beat;
 
-const KICKER_IN = BEAT * 1;    //  15 — the small line arrives first
-const TITLE_IN = BEAT * 2;     //  30 — then the word it introduces
-const RULE_IN = BEAT * 5;      //  75 — the rule draws under the settled title
-const BODY_IN = BEAT * 7;      // 105
-const EXIT = BEAT * 3;         //  45 reserved for the tail
+const KICKER_IN = B * 1;
+const TITLE_IN = B * 2;
+const RULE_IN = B * 5;
+const BODY_IN = B * 7;
+const EXIT = B * 3;   // frames reserved for the tail
 
 export default function OrientationWeek() {
   const frame = useCurrentFrame();
   const {fps, durationInFrames} = useVideoConfig();
 
-  // One spring carries the title. Damping 14 overshoots and lands, which is
-  // what makes it read as a hit rather than a slide.
-  const title = spring({frame: frame - TITLE_IN, fps, config: {damping: 14}});
+  // One spring carries the title. The damping comes from the direction, so a
+  // Feed cut overshoots and lands where a Poster settles flat.
+  const title = spring({
+    frame: frame - TITLE_IN,
+    fps,
+    config: {damping: DIRECTION.damping},
+  });
 
   const kicker = eramp(frame, KICKER_IN, KICKER_IN + 12);
   const rule = eramp(frame, RULE_IN, RULE_IN + 20);
@@ -50,72 +57,28 @@ export default function OrientationWeek() {
   );
 
   return (
-    <AbsoluteFill style={{backgroundColor: STORY.dark, opacity: exit}}>
-      <AbsoluteFill
-        style={{
-          justifyContent: "center",
-          padding: "0 96px",
-          gap: 28,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: MONO_FONT,
-            fontSize: 26,
-            letterSpacing: 8,
-            textTransform: "uppercase",
-            color: STORY.green,
-            opacity: kicker,
-            transform: \`translateY(\${(1 - kicker) * 14}px)\`,
-          }}
-        >
+    <Stage>
+      <AbsoluteFill style={{justifyContent: "center", padding: "0 96px", gap: 28, opacity: exit}}>
+        <Kicker style={{opacity: kicker, transform: \`translateY(\${(1 - kicker) * 14}px)\`}}>
           September
-        </div>
+        </Kicker>
 
-        <div
+        <Heading
+          text={"Orientation\\nweek."}
+          size={148}
           style={{
-            fontFamily: HEADING_FONT,
-            fontWeight: 900,
-            fontSize: 148,
-            lineHeight: 0.94,
-            letterSpacing: HEADING_TRACKING,
-            color: STORY.white,
             opacity: Math.min(1, title * 1.4),
             transform: \`translateY(\${(1 - title) * 90}px)\`,
           }}
-        >
-          Orientation
-          <br />
-          week.
-        </div>
-
-        {/* The rule wipes rather than fades — a hard edge travelling reads as
-            deliberate where an opacity ramp reads as an afterthought. */}
-        <div
-          style={{
-            height: 6,
-            width: 320,
-            backgroundColor: STORY.green,
-            transform: \`scaleX(\${rule})\`,
-            transformOrigin: "left center",
-          }}
         />
 
-        <div
-          style={{
-            fontFamily: BODY_FONT,
-            fontSize: 40,
-            lineHeight: 1.4,
-            maxWidth: 720,
-            color: STORY.muted,
-            opacity: body,
-            transform: \`translateY(\${(1 - body) * 20}px)\`,
-          }}
-        >
+        <Rule progress={rule} />
+
+        <Body style={{opacity: body, transform: \`translateY(\${(1 - body) * 20}px)\`}}>
           Find your people before you find your seat.
-        </div>
+        </Body>
       </AbsoluteFill>
-    </AbsoluteFill>
+    </Stage>
   );
 }
 `;

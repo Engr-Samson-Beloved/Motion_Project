@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
 import { Player } from "@remotion/player";
 
@@ -7,7 +7,14 @@ import {
   type CompiledComposition,
   type CompileResult,
 } from "./lib/compile";
-import { SYSTEM_PROMPT, editPreamble, repairPreamble } from "./lib/skill";
+import { editPreamble, repairPreamble, systemPrompt } from "./lib/skill";
+import {
+  BUILT_IN_BRANDS,
+  SKNG_DARK,
+  checkBrand,
+  type BrandProfile,
+} from "./lib/brand";
+import { DIRECTIONS, findDirection, type Direction } from "./lib/direction";
 import { EXAMPLE_NAME, EXAMPLE_SOURCE } from "./lib/example";
 import {
   PROVIDERS,
@@ -161,11 +168,11 @@ const SettingsPanel: FC<{
           disabled={checking || !credentials.apiKey.trim()}
           onClick={() => void check()}
         >
-          {checking ? "Checking…" : "Test key & list models"}
+          {checking ? "Checkingâ€¦" : "Test key & list models"}
         </button>
         {models ? (
           <span className="check-ok">
-            Key works — {models.length} model{models.length === 1 ? "" : "s"}
+            Key works â€” {models.length} model{models.length === 1 ? "" : "s"}
           </span>
         ) : null}
       </div>
@@ -199,7 +206,7 @@ const SettingsPanel: FC<{
         )}
         <small>
           {models
-            ? "Live from the provider — these are the ones this key can reach."
+            ? "Live from the provider â€” these are the ones this key can reach."
             : "Test the key to replace this with the models it can actually reach."}
         </small>
       </label>
@@ -244,6 +251,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [name, setName] = useState("Untitled");
 
+  const [brand, setBrand] = useState<BrandProfile>(SKNG_DARK);
+  const [direction, setDirection] = useState<Direction>(() =>
+    findDirection("feed"),
+  );
+
   const [support, setSupport] = useState<SupportReport | null>(null);
   const [rendering, setRendering] = useState<RenderProgress | null>(null);
   const [quality, setQuality] = useState<RenderQuality>("draft");
@@ -255,15 +267,33 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     void listCompositions().then(setSaved);
   }, []);
 
-  // /studio?example opens with the worked example already compiled, so the
-  // page can be linked to as a demonstration rather than described as one.
+  /**
+   * /studio?example opens with the worked example already compiled, and
+   * ?brand= / ?direction= pin the two axes — so a particular look can be sent
+   * as a link rather than described, and the claim that one source serves every
+   * brand can be checked rather than taken on trust.
+   */
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has("example")) {
-      return;
+    const params = new URLSearchParams(window.location.search);
+
+    const wantedBrand = params.get("brand");
+    if (wantedBrand) {
+      const found = BUILT_IN_BRANDS.find((b) => b.id === wantedBrand);
+      if (found) {
+        setBrand(found);
+      }
     }
-    setSource(EXAMPLE_SOURCE);
-    setName(EXAMPLE_NAME);
-    setCompiled(compileComposition(EXAMPLE_SOURCE));
+
+    const wantedDirection = params.get("direction");
+    if (wantedDirection && DIRECTIONS.some((d) => d.id === wantedDirection)) {
+      setDirection(findDirection(wantedDirection as Direction["id"]));
+    }
+
+    if (params.has("example")) {
+      setSource(EXAMPLE_SOURCE);
+      setName(EXAMPLE_NAME);
+      // The recompile effect below picks it up from `source`.
+    }
   }, []);
 
   useEffect(() => {
@@ -289,11 +319,26 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, [ready]);
 
-  const compile = useCallback((next: string) => {
-    const result = compileComposition(next);
-    setCompiled(result);
-    return result;
-  }, []);
+  const compile = useCallback(
+    (next: string) => {
+      const result = compileComposition(next, brand, direction);
+      setCompiled(result);
+      return result;
+    },
+    [brand, direction],
+  );
+
+  /**
+   * Recompile whenever the brand or the direction changes. This is the whole
+   * thesis made visible: the same generated source, unedited, re-renders as a
+   * different client in a different treatment â€” because no colour, font or
+   * grade setting was ever in the source to begin with.
+   */
+  useEffect(() => {
+    if (source) {
+      setCompiled(compileComposition(source, brand, direction));
+    }
+  }, [brand, direction, source]);
 
   const run = useCallback(
     async (userPrompt: string, mode: "create" | "edit") => {
@@ -308,7 +353,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
       try {
         const first = await generateComposition({
           credentials,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt(brand, direction),
           prompt:
             mode === "edit" && source
               ? `${editPreamble(source)}\n\nThe change: ${userPrompt}`
@@ -321,14 +366,14 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         let result = compile(first);
 
         // One automatic repair. The model sees its own output and the error,
-        // which fixes most first-attempt failures — a stray import, a missing
-        // export — without the person driving having to read a stack trace.
+        // which fixes most first-attempt failures â€” a stray import, a missing
+        // export â€” without the person driving having to read a stack trace.
         if (!result.ok) {
           setBusy("repairing");
           setStreamed("");
           const fixed = await generateComposition({
             credentials,
-            system: SYSTEM_PROMPT,
+            system: systemPrompt(brand, direction),
             prompt: repairPreamble(first, result.message),
             signal: controller.signal,
             onToken: (chunk) => setStreamed((prior) => prior + chunk),
@@ -358,7 +403,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         generateAbort.current = null;
       }
     },
-    [compile, credentials, source],
+    [brand, compile, credentials, direction, source],
   );
 
   const onSave = useCallback(async () => {
@@ -427,12 +472,17 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     [compile],
   );
 
+  // Contrast failures are invisible in a profile and obvious in a frame. The
+  // README records this repo shipping exactly that mistake — a mark drawn in
+  // the brand's own green, on a field at almost the same value.
+  const brandIssues = useMemo(() => checkBrand(brand), [brand]);
+
   const durationLabel = useMemo(() => {
     if (!ready) {
       return null;
     }
     const seconds = ready.config.durationInFrames / ready.config.fps;
-    return `${ready.config.width}x${ready.config.height} · ${seconds.toFixed(1)}s · ${ready.config.fps}fps`;
+    return `${ready.config.width}x${ready.config.height} Â· ${seconds.toFixed(1)}s Â· ${ready.config.fps}fps`;
   }, [ready]);
 
   const hasKey = credentials.apiKey.trim().length > 0;
@@ -465,7 +515,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           onClick={() => setShowSettings(true)}
         >
           {hasKey
-            ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} · ${credentials.model}`
+            ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} Â· ${credentials.model}`
             : "Add API key"}
         </button>
       </header>
@@ -499,6 +549,67 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               }}
             />
           </label>
+
+          {/*
+            Brand and Direction are the two axes the whole tool turns on: the
+            client's colour and type on one side, the film craft on the other.
+            They sit above the button because they change what gets written,
+            not what happens after it.
+          */}
+          <div className="axis-row">
+            <label className="field">
+              <span>Brand</span>
+              <select
+                value={brand.id}
+                onChange={(event) =>
+                  setBrand(
+                    BUILT_IN_BRANDS.find((b) => b.id === event.target.value) ??
+                      SKNG_DARK,
+                  )
+                }
+              >
+                {BUILT_IN_BRANDS.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Direction</span>
+              <select
+                value={direction.id}
+                onChange={(event) =>
+                  setDirection(findDirection(event.target.value as Direction["id"]))
+                }
+              >
+                {DIRECTIONS.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="axis-note">
+            <span className="swatches" aria-hidden="true">
+              <span style={{ background: brand.ground }} />
+              <span style={{ background: brand.ink }} />
+              <span style={{ background: brand.accent }} />
+              <span style={{ background: brand.muted }} />
+            </span>
+            {direction.note}
+          </div>
+
+          {brandIssues.length > 0 ? (
+            <div className="axis-warn">
+              {brandIssues.map((issue) => (
+                <div key={issue.field}>{issue.message}</div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="composer-actions">
             {busy ? (
@@ -539,7 +650,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           {busy ? (
             <p className="status">
               {busy === "repairing"
-                ? "That did not compile — asking for a fix"
+                ? "That did not compile â€” asking for a fix"
                 : "Writing"}
               <span className="counter">{streamed.length} chars</span>
             </p>
@@ -652,7 +763,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                     compositionHeight={ready.config.height}
                     // Open partway in, not on frame 0. Almost every
                     // composition fades up from nothing, so frame 0 is an
-                    // empty rectangle — which, right after a generation,
+                    // empty rectangle â€” which, right after a generation,
                     // looks exactly like a piece that failed to render.
                     initialFrame={Math.floor(ready.config.durationInFrames * 0.35)}
                     controls
