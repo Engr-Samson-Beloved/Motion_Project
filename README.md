@@ -282,6 +282,66 @@ IndexedDB. Nothing is stored on a server, and the app can never pay for anyone's
 inference. Anthropic goes through the official SDK; OpenAI, Google and any
 OpenAI-compatible endpoint (OpenRouter, Groq, a local server) go over REST.
 
+#### Brand × Direction
+
+The composer takes two orthogonal inputs, and the split is the reason one
+composition can serve every client.
+
+**Brand** is data — `web/lib/brand.ts`. Colours carry *roles* (`ground`, `ink`,
+`muted`, `accent`, `line`, `warn`, `stop`) rather than names, because six hex
+codes with no semantics is exactly why generated work looks amateur: the accent
+ends up as body text and the signal red becomes decoration. A role can be
+contrast-checked, and it tells the grade which ground it is working against.
+
+**Direction** is film — `web/lib/direction.ts`. Four treatments (Documentary,
+Feed, Poster, Product), each bundling camera, grade, BPM, spring damping and
+stagger. Nothing in it refers to a client.
+
+They meet in `web/lib/stage.tsx`, which the composition sees as `@/stage`:
+
+```tsx
+<Stage>                       {/* ground + grade + camera, already correct */}
+  <Kicker>September</Kicker>
+  <Heading text={"Orientation\nweek."} size={148} />
+  <Rule progress={rule} />
+  <Body>Find your people before you find your seat.</Body>
+</Stage>
+```
+
+Four things this buys, each of which was otherwise a rule someone had to
+remember:
+
+**The brand becomes unforgeable.** A model told to "use #165538" drifts — it
+paraphrases hex codes, invents near-misses, and has forgotten by line 200. A
+model told to import `BRAND` cannot, because the values never appear in its
+output. Swap the brand and the *same unedited source* re-renders as another
+client: `/studio?example&brand=neutral&direction=documentary`.
+
+**The grade calibrates itself to the ground.** Bloom and vignette are both
+falloffs and on a near-white field read as a dirty print, which is why `tour/`
+and `update/` run grain-only. `gradeFor()` zeroes them on any light brand, so
+every light client gets that correction without asking.
+
+**Two directions have no camera, and cannot get one.** `month/` has none because
+it is a poster on a visible seven-column measure and drift on a grid reads as a
+wobble; `install/` has none because it is hairlines and 13pt UI text and the
+viewer is *reading*. Poster and Product encode both. A prompt would forget.
+
+**`<Heading>` measures itself.** It takes a string, not children, because the
+same words are a different width in every brand's face — and a brand whose voice
+is `caps` sets far wider than one in sentence case. `size` is a cap, never
+exceeded. The safe width also shrinks when a camera is active, since
+`<HandheldCamera>` scales the frame up before it drifts and anything near an
+edge is pushed out of shot. This was caught by looking: the neutral brand in
+Documentary clipped "ORIENTATION" against the frame edge, and nothing in the
+source said so.
+
+One trap worth recording, because it cost a render to see: **the ground must sit
+inside `<FilmGrade>`, not behind it.** The grade is an SVG filter chain, and a
+filter with nothing opaque underneath composites its grain over transparency —
+which renders as a flat mid-grey field whatever colour the brand is.
+`install/AddToHome.tsx` is the clearest example of doing it right.
+
 `/studio?example` opens with a worked example already compiled — the fastest way
 to see the pipeline run without a key, and the end-to-end test of the part most
 likely to break.
