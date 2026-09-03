@@ -144,7 +144,6 @@ export const compileComposition = (rawSource: string): CompileResult => {
   };
 
   try {
-    // eslint-disable-next-line no-new-func
     const factory = new Function("require", "module", "exports", code);
     factory(requireShim, moduleObject, moduleObject.exports);
   } catch (error) {

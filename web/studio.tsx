@@ -8,6 +8,7 @@ import {
   type CompileResult,
 } from "./lib/compile";
 import { SYSTEM_PROMPT, editPreamble, repairPreamble } from "./lib/skill";
+import { EXAMPLE_NAME, EXAMPLE_SOURCE } from "./lib/example";
 import {
   PROVIDERS,
   clearCredentials,
@@ -182,6 +183,17 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
   useEffect(() => {
     void listCompositions().then(setSaved);
+  }, []);
+
+  // /studio?example opens with the worked example already compiled, so the
+  // page can be linked to as a demonstration rather than described as one.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has("example")) {
+      return;
+    }
+    setSource(EXAMPLE_SOURCE);
+    setName(EXAMPLE_NAME);
+    setCompiled(compileComposition(EXAMPLE_SOURCE));
   }, []);
 
   useEffect(() => {
@@ -465,6 +477,21 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
           {!source && !busy ? (
             <div className="examples">
+              <span className="label">No key yet?</span>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setSource(EXAMPLE_SOURCE);
+                  setName(EXAMPLE_NAME);
+                  setCurrentId(null);
+                  setError(null);
+                  compile(EXAMPLE_SOURCE);
+                  setTab("preview");
+                }}
+              >
+                Load a worked example
+              </button>
               <span className="label">Try</span>
               {EXAMPLES.map((example) => (
                 <button
@@ -553,6 +580,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                     fps={ready.config.fps}
                     compositionWidth={ready.config.width}
                     compositionHeight={ready.config.height}
+                    // Open partway in, not on frame 0. Almost every
+                    // composition fades up from nothing, so frame 0 is an
+                    // empty rectangle — which, right after a generation,
+                    // looks exactly like a piece that failed to render.
+                    initialFrame={Math.floor(ready.config.durationInFrames * 0.35)}
                     controls
                     loop
                     clickToPlay

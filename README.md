@@ -230,6 +230,68 @@ That `caveat` field is the general mechanism, not a special case for this piece:
 set it on anything that plays back wrongly in a browser, so the gallery never
 leaves a viewer guessing whether the piece or the page is broken.
 
+### The composer — `/studio`
+
+Authoring, without a terminal. Describe a piece, a model writes the
+composition, it compiles and plays in the page, and it exports an MP4 — all in
+the browser, with your own API key.
+
+**This is not Remotion Studio, and it cannot be.** `remotion studio` is a Node
+server: it bundles `src/`, watches the filesystem, and writes your source files
+back when you edit props or keyframes. `studioHtml()` — the function producing
+that page — has exactly one call site in all of `node_modules`, inside
+`@remotion/studio-server`. No command emits a static Studio, so there is nothing
+to deploy. Remotion does define a `BrowserStudioOperations` interface and an
+injection point at `window.remotion_browserStudio`, but nothing ships an
+implementation. So the authoring loop is rebuilt here rather than hosted.
+
+| Studio does it with | The composer does it with |
+|---|---|
+| rspack bundling a watched filesystem | Sucrase compiling a string, in the page |
+| imports resolved from `node_modules` | a frozen module map in `web/lib/compile.ts` |
+| a preview canvas | `@remotion/player`, the same component |
+| a Node render spawning Chrome + ffmpeg | `renderMediaOnWeb`, WebCodecs in the tab |
+| your editor, and your own knowledge | the prompt, and the skill pack |
+
+Four things carry it:
+
+**`web/lib/skill.ts` is the skill, written down.** In the terminal that
+knowledge lives in this README plus whatever the person driving happens to
+remember, and neither travels to a model behind someone else's API key. The
+system prompt there holds the frame-pure model, the palettes, the toolkit, the
+beat arithmetic, and the specific traps — no network fonts, no `setTimeout`,
+clamp both ends of an `interpolate`, even dimensions because h264 encodes in
+2x2 blocks. Every "never" in it is there because doing the other thing once cost
+a render pass.
+
+**The module map is the security boundary.** Generated code is evaluated, so
+whatever a listed module can do, generated code can do. Nothing resolves except
+what is listed, and nothing listed reaches the network or storage.
+`@remotion/transitions` and `@remotion/shapes` are deliberately excluded — both
+draw through HTML-in-Canvas, so a composition using them would compile, preview
+black, and give no clue why.
+
+**Failures repair themselves once.** If the generated file will not compile, the
+error and the model's own output go back to it automatically. Most first-attempt
+failures — a stray import, a missing export — are fixed without anyone reading a
+stack trace.
+
+**No backend.** The key goes straight from the page to the provider and is held
+in `sessionStorage`, so it is gone when the tab closes. Compositions live in
+IndexedDB. Nothing is stored on a server, and the app can never pay for anyone's
+inference. Anthropic goes through the official SDK; OpenAI, Google and any
+OpenAI-compatible endpoint (OpenRouter, Groq, a local server) go over REST.
+
+`/studio?example` opens with a worked example already compiled — the fastest way
+to see the pipeline run without a key, and the end-to-end test of the part most
+likely to break.
+
+Two limits worth knowing. The browser renderer paints CSS itself rather than
+using Chrome's compositor, so it supports a subset — check a piece before
+promising an export of it, and use draft (half size, a quarter of the pixels)
+while iterating. And a full-length 1080p render is minutes of sustained work in
+a tab.
+
 ### Deploying
 
 `vercel.json` is set up for a static deploy: `npm run build` into `dist/`, with

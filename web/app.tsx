@@ -1,6 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { FC, ReactNode } from "react";
 import { Player, Thumbnail } from "@remotion/player";
+
+/**
+ * The studio carries a TSX compiler, the Anthropic SDK and the video encoder —
+ * about a megabyte that someone who came only to watch the films should never
+ * download. Ordinary React.lazy is right here: this is page chrome, not a
+ * composition, so the blank-frame problem that forces Remotion's own
+ * `lazyComponent` on CinemaProbe does not apply.
+ */
+const Studio = lazy(() =>
+  import("./studio").then((m) => ({ default: m.Studio })),
+);
 import {
   COMPOSITIONS,
   KIND_LABEL,
@@ -170,7 +189,10 @@ const Card: FC<{ entry: RegistryEntry; onOpen: (id: string) => void }> = ({
 
 const KIND_ORDER: readonly CompositionKind[] = ["film", "social", "still", "lab"];
 
-const Gallery: FC<{ onOpen: (id: string) => void }> = ({ onOpen }) => {
+const Gallery: FC<{
+  onOpen: (id: string) => void;
+  onOpenStudio: () => void;
+}> = ({ onOpen, onOpenStudio }) => {
   const grouped = useMemo(
     () =>
       KIND_ORDER.map((kind) => ({
@@ -195,6 +217,19 @@ const Gallery: FC<{ onOpen: (id: string) => void }> = ({ onOpen }) => {
         <div className="wordmark">
           <img src="/skng-logo.png" alt="" width="34" height="34" />
           <span>Motion Project</span>
+          <a
+            className="to-studio"
+            href="/studio"
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                return;
+              }
+              event.preventDefault();
+              onOpenStudio();
+            }}
+          >
+            Make one &rarr;
+          </a>
         </div>
         <h1>Video, written as React components.</h1>
         <p className="standfirst">
@@ -394,19 +429,39 @@ export const App: FC = () => {
 
   const match = /^\/c\/([^/]+)\/?$/.exec(path);
   const entry = match ? findComposition(decodeURIComponent(match[1])) : undefined;
+  const inStudio = /^\/studio\/?$/.test(path);
 
   useEffect(() => {
-    document.title = entry
-      ? `${entry.title} · Motion Project`
-      : "Motion Project";
-  }, [entry]);
+    document.title = inStudio
+      ? "Make one · Motion Project"
+      : entry
+        ? `${entry.title} · Motion Project`
+        : "Motion Project";
+  }, [entry, inStudio]);
+
+  // The studio owns the whole viewport and carries its own chrome, so it sits
+  // outside the gallery's page wrapper and footer.
+  if (inStudio) {
+    return (
+      <Suspense
+        fallback={
+          <div className="studio-loading">Loading the composer&hellip;</div>
+        }
+      >
+        <Studio onBack={() => navigate("/")} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="page">
       {entry ? (
         <Detail entry={entry} onBack={() => navigate("/")} />
       ) : (
-        <Gallery onOpen={(id) => navigate(`/c/${id}`)} />
+        <Gallery
+          onOpen={(id) => navigate(`/c/${id}`)}
+          onOpenStudio={() => navigate("/studio")}
+        />
       )}
 
       <footer className="foot">

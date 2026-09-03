@@ -20,6 +20,11 @@ export default [
     rules: {
       "@remotion/warn-native-media-tag": "off",
       "@remotion/no-string-assets": "off",
+      // Remotion bans Math.random() because a value that changes between
+      // frames tears a render. Nothing in web/ is inside a frame — the only
+      // use is minting an id for a row in IndexedDB, where unpredictability
+      // is the point.
+      "@remotion/deterministic-randomness": "off",
     },
   },
 ];
