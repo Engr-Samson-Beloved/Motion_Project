@@ -36,9 +36,9 @@ import {
 } from "./lib/render";
 
 const DEFAULT_CREDENTIALS: Credentials = {
-  provider: "anthropic",
+  provider: "google",
   apiKey: "",
-  model: "claude-opus-5",
+  model: "gemini-3.5-flash",
   baseUrl: "",
 };
 
@@ -112,11 +112,20 @@ const SettingsPanel: FC<{
         <span>Model</span>
         <input
           type="text"
+          list="model-suggestions"
+          placeholder="Select or enter model name"
           value={credentials.model}
           onChange={(event) =>
             onChange({ ...credentials, model: event.target.value })
           }
         />
+        {provider?.models && provider.models.length > 0 ? (
+          <datalist id="model-suggestions">
+            {provider.models.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        ) : null}
       </label>
 
       <label className="field">

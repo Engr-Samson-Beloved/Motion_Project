@@ -17,12 +17,19 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
-export type ProviderId = "anthropic" | "openai" | "google" | "compatible";
+export type ProviderId =
+  | "google"
+  | "groq"
+  | "anthropic"
+  | "openai"
+  | "compatible";
 
 export type Provider = {
   id: ProviderId;
   label: string;
   defaultModel: string;
+  /** Available tested models for convenient selection */
+  models?: readonly string[];
   /** Where to get a key, shown under the field. */
   keyHint: string;
   /** Only the OpenAI-compatible entry needs one typed in. */
@@ -31,9 +38,36 @@ export type Provider = {
 
 export const PROVIDERS: readonly Provider[] = [
   {
+    id: "google",
+    label: "Google Gemini",
+    defaultModel: "gemini-3.5-flash",
+    models: [
+      "gemini-3.5-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-3-flash-preview",
+    ],
+    keyHint: "aistudio.google.com → Get API key",
+    needsBaseUrl: false,
+  },
+  {
+    id: "groq",
+    label: "Groq",
+    defaultModel: "openai/gpt-oss-120b",
+    models: [
+      "openai/gpt-oss-120b",
+      "openai/gpt-oss-20b",
+      "qwen/qwen3.8-27b",
+      "groq/compound",
+    ],
+    keyHint: "console.groq.com → API keys",
+    needsBaseUrl: false,
+  },
+  {
     id: "anthropic",
     label: "Anthropic",
     defaultModel: "claude-opus-5",
+    models: ["claude-opus-5", "claude-sonnet-4"],
     keyHint: "console.anthropic.com → API keys",
     needsBaseUrl: false,
   },
@@ -41,21 +75,15 @@ export const PROVIDERS: readonly Provider[] = [
     id: "openai",
     label: "OpenAI",
     defaultModel: "gpt-5.1",
+    models: ["gpt-5.1", "gpt-5-mini"],
     keyHint: "platform.openai.com → API keys",
-    needsBaseUrl: false,
-  },
-  {
-    id: "google",
-    label: "Google",
-    defaultModel: "gemini-3-pro",
-    keyHint: "aistudio.google.com → Get API key",
     needsBaseUrl: false,
   },
   {
     id: "compatible",
     label: "OpenAI-compatible",
     defaultModel: "",
-    keyHint: "OpenRouter, Groq, Together, or a local server",
+    keyHint: "OpenRouter, Together, or a local server",
     needsBaseUrl: true,
   },
 ];
@@ -275,6 +303,12 @@ export const generateComposition = async (
       return generateOpenAiShaped(options, "https://api.openai.com/v1", "OpenAI");
     case "google":
       return generateGoogle(options);
+    case "groq":
+      return generateOpenAiShaped(
+        options,
+        "https://api.groq.com/openai/v1",
+        "Groq",
+      );
     case "compatible": {
       if (!credentials.baseUrl.trim()) {
         throw new Error("Add the base URL for the compatible endpoint.");
