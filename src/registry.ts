@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The composition registry.
  *
  * Every piece in this repo is declared here once, and read twice: `Root.tsx`
@@ -12,7 +12,7 @@
  * deployed gallery.
  *
  * `posterFrame` is the only field here the CLI does not use. It is the frame a
- * gallery card freezes on, and it should be a frame *mid-animation* — a piece
+ * gallery card freezes on, and it should be a frame *mid-animation* â€” a piece
  * judged by its final held pose looks like every other piece.
  */
 
@@ -89,7 +89,7 @@ export type CompositionKind = "film" | "social" | "still" | "lab";
 
 /**
  * A composition that is fetched on demand rather than bundled into the first
- * load. Remotion's own `lazyComponent` prop, not `React.lazy` — the CLI awaits
+ * load. Remotion's own `lazyComponent` prop, not `React.lazy` â€” the CLI awaits
  * this before it starts a render pass, whereas a suspended subtree during a
  * render pass yields blank frames and a green exit code.
  */
@@ -116,11 +116,19 @@ export type RegistryEntry = {
   /** Frame a gallery card freezes on. Pick one mid-animation. */
   readonly posterFrame: number;
   /**
-   * True for pieces built from `public/screens/`, which is gitignored. They
-   * render, but with missing sources, so the gallery says so rather than
-   * showing a broken frame with no explanation.
+   * Set when a piece does not render faithfully in an ordinary browser. The
+   * gallery would otherwise show a black rectangle and leave the viewer to
+   * guess whether the piece or the page is broken.
+   *
+   * This is about the browser only. Everything here renders correctly through
+   * the CLI, which is the path that produces the actual deliverable.
    */
-  readonly requiresCaptures?: boolean;
+  readonly caveat?: {
+    /** A few words, shown on the gallery card. */
+    readonly flag: string;
+    /** The whole explanation, shown on the detail page. */
+    readonly detail: string;
+  };
 };
 
 /**
@@ -140,7 +148,7 @@ const define = <P,>(entry: {
   blurb: string;
   kind: CompositionKind;
   posterFrame?: number;
-  requiresCaptures?: boolean;
+  caveat?: RegistryEntry["caveat"];
 }): RegistryEntry =>
   ({
     fps: 30,
@@ -155,7 +163,7 @@ const define = <P,>(entry: {
  * Only `CinemaProbe` needs this today, and it is worth its own code path: it is
  * the one composition that pulls in three.js, `@react-three/fiber` and
  * `@react-three/postprocessing`, which together were about two thirds of the
- * gallery's JavaScript — spent on a rig the README calls "a test rig, not a
+ * gallery's JavaScript â€” spent on a rig the README calls "a test rig, not a
  * deliverable". Everything else here is drawn with shapes and CSS and costs
  * almost nothing to bundle.
  */
@@ -170,7 +178,7 @@ const defineLazy = (entry: {
   blurb: string;
   kind: CompositionKind;
   posterFrame?: number;
-  requiresCaptures?: boolean;
+  caveat?: RegistryEntry["caveat"];
 }): RegistryEntry => ({
   fps: 30,
   defaultProps: {},
@@ -216,7 +224,6 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     blurb:
       "Thirty-eight seconds of the real product, in its own light-mode colours. One continuous pan along seven captured screens.",
     posterFrame: 700,
-    requiresCaptures: true,
   }),
 
   define({
@@ -267,7 +274,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     kind: "social",
     title: "Same Question",
     blurb:
-      "Seven students, seven places, one question. No product UI anywhere — the argument made with people instead of screens.",
+      "Seven students, seven places, one question. No product UI anywhere â€” the argument made with people instead of screens.",
     posterFrame: 620,
   }),
 
@@ -306,7 +313,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     kind: "still",
     title: "Month Poster",
     blurb:
-      "The same month standing still — the calendar and the line at once, which is the thing motion does one after the other.",
+      "The same month standing still â€” the calendar and the line at once, which is the thing motion does one after the other.",
   }),
 
   define({
@@ -316,10 +323,9 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     width: TOUR_BOARD_WIDTH,
     height: TOUR_BOARD_HEIGHT,
     kind: "still",
-    title: "Campus Tour · contact sheet",
+    title: "Campus Tour Â· contact sheet",
     blurb:
       "Fourteen frames sampled where the piece can actually be wrong: each transition, each lens at full lift, each push-in at its furthest.",
-    requiresCaptures: true,
   }),
 
   define({
@@ -329,7 +335,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     width: INSTALL_BOARD_WIDTH,
     height: INSTALL_BOARD_HEIGHT,
     kind: "still",
-    title: "Add to Home · contact sheet",
+    title: "Add to Home Â· contact sheet",
     blurb: "Eighteen sampled frames of the install flow, as one still.",
   }),
 
@@ -340,7 +346,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     width: BOARD_WIDTH,
     height: BOARD_HEIGHT,
     kind: "still",
-    title: "Same Question · contact sheet",
+    title: "Same Question Â· contact sheet",
     blurb: "Eight sampled frames, one still.",
   }),
 
@@ -351,7 +357,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     width: STORY_BOARD_WIDTH,
     height: STORY_BOARD_HEIGHT,
     kind: "still",
-    title: "Story · contact sheet",
+    title: "Story Â· contact sheet",
     blurb:
       "Three sampled frames per scene. Judge layout, copy and pacing here; the full render is twenty minutes.",
   }),
@@ -363,7 +369,7 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     width: STORYBOARD_WIDTH,
     height: STORYBOARD_HEIGHT,
     kind: "still",
-    title: "Pulse · contact sheet",
+    title: "Pulse Â· contact sheet",
     blurb:
       "All thirteen Pulse scenes, each frozen 62% of the way through so every entrance has landed.",
   }),
@@ -404,6 +410,11 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     blurb:
       "The A/B rig. Each beat renders the same content twice, treated and untreated, split down the centre line.",
     posterFrame: 40,
+    caveat: {
+      flag: "needs a Chrome flag",
+      detail:
+        "This is the only piece that uses @remotion/transitions, and its three shader presentations — linearBlur, zoomBlur and filmBurn — draw through Remotion's HTML-in-Canvas. Chrome keeps that behind chrome://flags/#canvas-draw-element and leaves it off, so in an ordinary browser this composition renders black. Enable the flag and restart Chrome to watch it here. Nothing else in the gallery is affected, and the CLI renders it correctly either way.",
+    },
   }),
 
   define({
@@ -464,7 +475,7 @@ export const findComposition = (id: string): RegistryEntry | undefined =>
 
 /**
  * The component half of the props for `<Composition>`, `<Player>` and
- * `<Thumbnail>` — all three take the same either/or, so all three get it from
+ * `<Thumbnail>` â€” all three take the same either/or, so all three get it from
  * here rather than each re-deriving which of the two fields is set.
  */
 export const componentProps = (entry: RegistryEntry) =>

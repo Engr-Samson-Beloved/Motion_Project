@@ -216,10 +216,19 @@ Nothing fails — `tsc` passes, the CLI renders, Studio plays — and the first 
 of trouble is a deployed page playing a film in silence. `staticFile()` is a
 runtime lookup, so only a build-time check can catch it.
 
-`CampusTour` is built from `public/screens/`, which is gitignored on purpose:
-large, stale quickly, may hold real user data. It renders in the gallery with
-its sources missing, and the detail page says so rather than showing an
-unexplained blank device.
+**One composition does not survive the browser: `CinemaProbe`.** It is the only
+piece importing `@remotion/transitions`, and its three shader presentations —
+`linearBlur`, `zoomBlur`, `filmBurn` — draw through Remotion's HTML-in-Canvas,
+which Chrome keeps behind `chrome://flags/#canvas-draw-element` and leaves off.
+Without the flag it renders black. Its registry entry carries a `caveat`, so the
+gallery says that on the card and explains it on the detail page instead of
+showing an unexplained black rectangle. Nothing else is affected — no other file
+imports `@remotion/transitions` or `@remotion/shapes` — and the CLI renders it
+correctly either way.
+
+That `caveat` field is the general mechanism, not a special case for this piece:
+set it on anything that plays back wrongly in a browser, so the gallery never
+leaves a viewer guessing whether the piece or the page is broken.
 
 ### Deploying
 
@@ -228,13 +237,16 @@ a rewrite so `/c/SkoolConnectStory` serves the app rather than 404ing. Nothing
 renders server-side, so the Hobby tier is enough and there is no ffmpeg, no
 headless Chrome and no function timeout in the picture.
 
-Two things are unresolved and should be before the URL is public:
+`public/screens/` is tracked, so `CampusTour` and its contact sheet deploy whole
+rather than with blank devices.
 
-- **The Remotion licence.** `@remotion/player` asks for acknowledgement, and
-  browser-side rendering (`@remotion/web-renderer`, already installed) takes a
-  `licenseKey`. Check whether this use needs a company licence.
-- **`public/screens/`.** Either commit the patched captures or keep
-  `CampusTour` marked as local-only. Right now it deploys incomplete.
+One thing is unresolved and should be before the URL is public: **the Remotion
+licence.** `@remotion/player` asks for acknowledgement, and browser-side
+rendering (`@remotion/web-renderer`, already installed) takes a `licenseKey`.
+Check whether this use needs a company licence.
+
+Verified in Chrome 152 against the production build: all 21 compositions load,
+20 render correctly, and `CinemaProbe` is the documented exception above.
 
 ## Tuning guide
 

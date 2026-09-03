@@ -159,8 +159,8 @@ const Card: FC<{ entry: RegistryEntry; onOpen: (id: string) => void }> = ({
           <span>
             {entry.width}&times;{entry.height}
           </span>
-          {entry.requiresCaptures ? (
-            <span className="flag">needs captures</span>
+          {entry.caveat ? (
+            <span className="flag">{entry.caveat.flag}</span>
           ) : null}
         </div>
       </div>
@@ -355,14 +355,10 @@ const Detail: FC<{ entry: RegistryEntry; onBack: () => void }> = ({
           <h1>{entry.title}</h1>
           <p className="blurb">{entry.blurb}</p>
 
-          {entry.requiresCaptures ? (
+          {entry.caveat ? (
             <div className="notice">
-              <strong>Built from captured app screens.</strong> Those live in{" "}
-              <code>public/screens/</code>, which is gitignored — they are large,
-              go stale quickly and can hold real user data. This piece renders
-              here with its sources missing. Run{" "}
-              <code>node scripts/capture-screens.js</code> then{" "}
-              <code>npm run screens</code> locally to see it whole.
+              <strong>This one does not render in an ordinary browser.</strong>{" "}
+              {entry.caveat.detail}
             </div>
           ) : null}
 
