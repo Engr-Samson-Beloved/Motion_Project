@@ -855,12 +855,23 @@ code {
 }
 
 .stage {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 22px;
   min-height: 0;
+}
+
+/* Sits over the frame while it has nothing to show. */
+.stage > .empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
 }
 
 .empty {

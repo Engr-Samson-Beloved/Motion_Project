@@ -1,4 +1,37 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Connect, type Plugin } from "vite";
+
+/**
+ * Lets the sandbox load its own code.
+ *
+ * `web/sandbox.html` runs in an iframe carrying `sandbox="allow-scripts"` and
+ * deliberately not `allow-same-origin`, which puts it on an opaque origin —
+ * that is the whole point, because it is what stops model-written code reaching
+ * the composer's sessionStorage and the API key in it. The cost is that its own
+ * module scripts are then a cross-origin fetch sending `Origin: null`, and a
+ * plain static server answers those with no `Access-Control-Allow-Origin`, so
+ * the frame silently loads nothing.
+ *
+ * These are public build artifacts, so serving them to any origin costs
+ * nothing. Vercel gets the same header from `vercel.json`.
+ */
+const allowSandboxToFetchItsOwnCode = (): Plugin => {
+  const middleware: Connect.NextHandleFunction = (_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    next();
+  };
+  // Block bodies on purpose. `middlewares.use()` returns the Connect app, and
+  // a value returned from these hooks is treated by Vite as a post-hook to
+  // call later — which invokes the app with no request and throws.
+  return {
+    name: "sandbox-cors",
+    configureServer(server) {
+      server.middlewares.use(middleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware);
+    },
+  };
+};
 
 /**
  * The gallery app.
@@ -26,9 +59,23 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: "web",
   publicDir: "../public",
+  plugins: [allowSandboxToFetchItsOwnCode()],
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      /*
+        Two entry points. `sandbox.html` is loaded into an opaque-origin iframe
+        and is the only place model-written code is evaluated — it needs its own
+        document, because the isolation comes from the frame's origin rather
+        than from anything the script does.
+      */
+      // Resolved relative to `root`, which is `web/`.
+      input: {
+        index: "index.html",
+        sandbox: "sandbox.html",
+      },
+    },
   },
   server: {
     // The app imports compositions from `src/`, which is outside `root`.

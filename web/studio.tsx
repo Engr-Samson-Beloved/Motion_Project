@@ -1,12 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FC } from "react";
-import { Player } from "@remotion/player";
 
-import {
-  compileComposition,
-  type CompiledComposition,
-  type CompileResult,
-} from "./lib/compile";
+import { useSandbox } from "./lib/use-sandbox";
 import { editPreamble, repairPreamble, systemPrompt } from "./lib/skill";
 import {
   BUILT_IN_BRANDS,
@@ -35,13 +30,7 @@ import {
   slugify,
   type SavedComposition,
 } from "./lib/storage";
-import {
-  checkSupport,
-  renderToBlob,
-  type RenderProgress,
-  type RenderQuality,
-  type SupportReport,
-} from "./lib/render";
+import { scaleFor, type RenderQuality } from "./lib/render";
 
 const DEFAULT_CREDENTIALS: Credentials = {
   provider: "google",
@@ -240,7 +229,6 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const [prompt, setPrompt] = useState("");
   const [source, setSource] = useState("");
-  const [compiled, setCompiled] = useState<CompileResult | null>(null);
 
   const [busy, setBusy] = useState<null | "generating" | "repairing">(null);
   const [streamed, setStreamed] = useState("");
@@ -256,12 +244,25 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     findDirection("feed"),
   );
 
-  const [support, setSupport] = useState<SupportReport | null>(null);
-  const [rendering, setRendering] = useState<RenderProgress | null>(null);
   const [quality, setQuality] = useState<RenderQuality>("draft");
 
   const generateAbort = useRef<AbortController | null>(null);
-  const renderAbort = useRef<AbortController | null>(null);
+
+  /**
+   * Everything to do with running the composition happens in the sandbox
+   * frame: compiling, playing, encoding. Nothing model-written is evaluated in
+   * this page, so nothing model-written can reach the API key.
+   */
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  // Destructured because `useSandbox` returns a fresh object each render; the
+  // callbacks inside it are stable, the wrapper is not, and depending on the
+  // wrapper in an effect would loop forever.
+  const {
+    state: sandboxState,
+    load: loadSandbox,
+    render: renderSandbox,
+    cancelRender,
+  } = useSandbox(frameRef);
 
   useEffect(() => {
     void listCompositions().then(setSaved);
@@ -300,33 +301,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     saveCredentials(credentials);
   }, [credentials]);
 
-  const ready: CompiledComposition | null =
-    compiled?.ok === true ? compiled.value : null;
-
-  useEffect(() => {
-    if (!ready) {
-      setSupport(null);
-      return;
-    }
-    let live = true;
-    void checkSupport(ready.config).then((report) => {
-      if (live) {
-        setSupport(report);
-      }
-    });
-    return () => {
-      live = false;
-    };
-  }, [ready]);
-
-  const compile = useCallback(
-    (next: string) => {
-      const result = compileComposition(next, brand, direction);
-      setCompiled(result);
-      return result;
-    },
-    [brand, direction],
-  );
+  const config = sandboxState.config;
 
   /**
    * Recompile whenever the brand or the direction changes. This is the whole
@@ -336,9 +311,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
    */
   useEffect(() => {
     if (source) {
-      setCompiled(compileComposition(source, brand, direction));
+      void loadSandbox(source, brand, direction);
     }
-  }, [brand, direction, source]);
+  }, [brand, direction, loadSandbox, source]);
 
   const run = useCallback(
     async (userPrompt: string, mode: "create" | "edit") => {
@@ -363,7 +338,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         });
 
         setSource(first);
-        let result = compile(first);
+        let result = await loadSandbox(first, brand, direction);
 
         // One automatic repair. The model sees its own output and the error,
         // which fixes most first-attempt failures â€” a stray import, a missing
@@ -379,7 +354,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             onToken: (chunk) => setStreamed((prior) => prior + chunk),
           });
           setSource(fixed);
-          result = compile(fixed);
+          result = await loadSandbox(fixed, brand, direction);
         }
 
         if (result.ok) {
@@ -403,7 +378,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         generateAbort.current = null;
       }
     },
-    [brand, compile, credentials, direction, source],
+    [brand, credentials, direction, loadSandbox, source],
   );
 
   const onSave = useCallback(async () => {
@@ -432,45 +407,29 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [name, source]);
 
   const onExportVideo = useCallback(async () => {
-    if (!ready) {
+    if (!config) {
       return;
     }
     setError(null);
-    const controller = new AbortController();
-    renderAbort.current = controller;
-    setRendering({ progress: 0, encodedFrames: 0, totalFrames: ready.config.durationInFrames });
-
     try {
-      const blob = await renderToBlob({
-        component: ready.component,
-        config: ready.config,
-        quality,
-        signal: controller.signal,
-        onProgress: setRendering,
-      });
-      downloadBlob(blob, `${slugify(name)}${quality === "draft" ? "-draft" : ""}.mp4`);
+      const blob = await renderSandbox(scaleFor(quality));
+      downloadBlob(
+        blob,
+        `${slugify(name)}${quality === "draft" ? "-draft" : ""}.mp4`,
+      );
     } catch (thrown) {
-      if (!controller.signal.aborted) {
-        setError(thrown instanceof Error ? thrown.message : String(thrown));
-      }
-    } finally {
-      setRendering(null);
-      renderAbort.current = null;
+      setError(thrown instanceof Error ? thrown.message : String(thrown));
     }
-  }, [name, quality, ready]);
+  }, [config, name, quality, renderSandbox]);
 
-  const openSaved = useCallback(
-    (record: SavedComposition) => {
-      setCurrentId(record.id);
-      setName(record.name);
-      setSource(record.source);
-      setPrompt(record.prompt);
-      compile(record.source);
-      setTab("preview");
-      setError(null);
-    },
-    [compile],
-  );
+  const openSaved = useCallback((record: SavedComposition) => {
+    setCurrentId(record.id);
+    setName(record.name);
+    setSource(record.source);
+    setPrompt(record.prompt);
+    setTab("preview");
+    setError(null);
+  }, []);
 
   // Contrast failures are invisible in a profile and obvious in a frame. The
   // README records this repo shipping exactly that mistake — a mark drawn in
@@ -478,12 +437,12 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const brandIssues = useMemo(() => checkBrand(brand), [brand]);
 
   const durationLabel = useMemo(() => {
-    if (!ready) {
+    if (!config) {
       return null;
     }
-    const seconds = ready.config.durationInFrames / ready.config.fps;
-    return `${ready.config.width}x${ready.config.height} Â· ${seconds.toFixed(1)}s Â· ${ready.config.fps}fps`;
-  }, [ready]);
+    const seconds = config.durationInFrames / config.fps;
+    return `${config.width}x${config.height} · ${seconds.toFixed(1)}s · ${config.fps}fps`;
+  }, [config]);
 
   const hasKey = credentials.apiKey.trim().length > 0;
 
@@ -515,7 +474,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           onClick={() => setShowSettings(true)}
         >
           {hasKey
-            ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} Â· ${credentials.model}`
+            ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} · ${credentials.model}`
             : "Add API key"}
         </button>
       </header>
@@ -636,7 +595,6 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                 className="ghost"
                 onClick={() => {
                   setSource("");
-                  setCompiled(null);
                   setCurrentId(null);
                   setName("Untitled");
                   setError(null);
@@ -667,7 +625,6 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                   setName(EXAMPLE_NAME);
                   setCurrentId(null);
                   setError(null);
-                  compile(EXAMPLE_SOURCE);
                   setTab("preview");
                 }}
               >
@@ -739,70 +696,78 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             ) : null}
           </div>
 
-          {error ? <div className="error-bar">{error}</div> : null}
-
-          {tab === "preview" ? (
-            <div className="stage">
-              {ready ? (
-                <div
-                  className="stage-frame"
-                  style={{
-                    aspectRatio: `${ready.config.width} / ${ready.config.height}`,
-                    maxWidth: `calc(62vh * ${ready.config.width / ready.config.height})`,
-                  }}
-                >
-                  <Player
-                    // Remount on every recompile, or the player keeps the
-                    // previous component's internal state.
-                    key={source}
-                    component={ready.component}
-                    inputProps={{}}
-                    durationInFrames={ready.config.durationInFrames}
-                    fps={ready.config.fps}
-                    compositionWidth={ready.config.width}
-                    compositionHeight={ready.config.height}
-                    // Open partway in, not on frame 0. Almost every
-                    // composition fades up from nothing, so frame 0 is an
-                    // empty rectangle â€” which, right after a generation,
-                    // looks exactly like a piece that failed to render.
-                    initialFrame={Math.floor(ready.config.durationInFrames * 0.35)}
-                    controls
-                    loop
-                    clickToPlay
-                    allowFullscreen
-                    style={{ width: "100%", height: "100%" }}
-                    errorFallback={({ error: playerError }) => (
-                      <div className="render-error">
-                        <span className="render-error-label">Threw while playing</span>
-                        <span className="render-error-message">
-                          {playerError.message}
-                        </span>
-                      </div>
-                    )}
-                  />
-                </div>
-              ) : (
-                <div className="empty">
-                  <p>
-                    {hasKey
-                      ? "Describe a piece on the left. It compiles and plays here."
-                      : "Add an API key to start. It stays in this browser."}
-                  </p>
-                </div>
-              )}
+          {error ?? sandboxState.error ? (
+            <div className="error-bar">
+              {error ??
+                `${sandboxState.error?.stage}: ${sandboxState.error?.message}`}
             </div>
-          ) : (
+          ) : null}
+
+          {/*
+            The sandbox is mounted for the life of the page rather than only
+            when there is something to show: it is a separate document, and
+            remounting it on every generation would pay for its whole bundle
+            again. It is hidden until something compiles.
+
+            `sandbox="allow-scripts"` WITHOUT `allow-same-origin` is the point
+            of the whole arrangement. That combination puts the frame on an
+            opaque origin, so model-written code cannot reach this page's
+            sessionStorage, where the API key lives.
+          */}
+          <div className="stage" hidden={tab !== "preview"}>
+            {/*
+              Sized even before anything compiles, and never `hidden`. A
+              display:none iframe is deprioritised by the browser — it loaded
+              eventually, sometimes, which presented as a preview that worked
+              on one run in four. It is transparent until it has something to
+              show, and the empty message sits over it.
+            */}
+            <div
+              className="stage-frame"
+              style={{
+                aspectRatio: config
+                  ? `${config.width} / ${config.height}`
+                  : "9 / 16",
+                maxWidth: `calc(62vh * ${
+                  config ? config.width / config.height : 9 / 16
+                })`,
+                opacity: config ? 1 : 0,
+              }}
+            >
+              <iframe
+                ref={frameRef}
+                title="Composition preview"
+                src="/sandbox.html"
+                sandbox="allow-scripts"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: 0,
+                  display: "block",
+                }}
+              />
+            </div>
+
+            {!config ? (
+              <div className="empty">
+                <p>
+                  {hasKey
+                    ? "Describe a piece on the left. It compiles and plays here."
+                    : "Add an API key to start. It stays in this browser."}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {tab === "source" ? (
             <textarea
               className="source"
               spellCheck={false}
               value={busy && streamed ? streamed : source}
-              onChange={(event) => {
-                setSource(event.target.value);
-                compile(event.target.value);
-              }}
+              onChange={(event) => setSource(event.target.value)}
               placeholder="The generated composition appears here, and you can edit it."
             />
-          )}
+          ) : null}
 
           <div className="export-bar">
             <button
@@ -824,9 +789,10 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
             <div className="spacer" />
 
-            {ready && support && !support.canRender ? (
+            {config && sandboxState.support && !sandboxState.support.canRender ? (
               <span className="unsupported">
-                {support.issues[0]?.message ?? "This browser cannot encode video."}
+                {sandboxState.support.issues[0] ??
+                  "This browser cannot encode video."}
               </span>
             ) : null}
 
@@ -836,25 +802,21 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                 setQuality(event.target.value as RenderQuality)
               }
               aria-label="Export quality"
-              disabled={rendering !== null}
+              disabled={sandboxState.progress !== null}
             >
               <option value="draft">Draft (half size)</option>
               <option value="full">Full size</option>
             </select>
 
-            {rendering ? (
-              <button
-                type="button"
-                className="ghost danger"
-                onClick={() => renderAbort.current?.abort()}
-              >
-                Cancel {Math.round(rendering.progress * 100)}%
+            {sandboxState.progress ? (
+              <button type="button" className="ghost danger" onClick={cancelRender}>
+                Cancel {Math.round(sandboxState.progress.progress * 100)}%
               </button>
             ) : (
               <button
                 type="button"
                 className="primary"
-                disabled={!ready || support?.canRender === false}
+                disabled={!config || sandboxState.support?.canRender === false}
                 onClick={() => void onExportVideo()}
               >
                 Export MP4
@@ -862,11 +824,13 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             )}
           </div>
 
-          {rendering ? (
+          {sandboxState.progress ? (
             <div className="progress">
               <div
                 className="progress-fill"
-                style={{ width: `${Math.round(rendering.progress * 100)}%` }}
+                style={{
+                  width: `${Math.round(sandboxState.progress.progress * 100)}%`,
+                }}
               />
             </div>
           ) : null}

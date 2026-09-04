@@ -30,10 +30,15 @@ export type RenderProgress = {
 
 export type RenderQuality = "draft" | "full";
 
+/** Draft halves the linear dimensions, so it is a quarter of the pixels and
+ *  roughly a quarter of the time. Enough to check timing and composition. */
+export const scaleFor = (quality: RenderQuality) =>
+  quality === "draft" ? 0.5 : 1;
+
 export type RenderRequest = {
   component: React.FC<Record<string, unknown>>;
   config: CompositionConfig;
-  quality: RenderQuality;
+  scale: number;
   signal: AbortSignal;
   onProgress: (progress: RenderProgress) => void;
 };
@@ -77,15 +82,10 @@ export const checkSupport = async (
 export const renderToBlob = async ({
   component,
   config,
-  quality,
+  scale,
   signal,
   onProgress,
 }: RenderRequest): Promise<Blob> => {
-  // Draft halves the linear dimensions, so it is a quarter of the pixels and
-  // roughly a quarter of the time. Enough to check timing and composition,
-  // which is what a draft is for.
-  const scale = quality === "draft" ? 0.5 : 1;
-
   const result = await renderMediaOnWeb({
     composition: {
       id: "preview",
