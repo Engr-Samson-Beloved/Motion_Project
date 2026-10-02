@@ -90,6 +90,7 @@ export type GenerateOptions = {
   credentials: Credentials;
   system: string;
   prompt: string;
+  images?: {name: string; dataUrl: string; type: string}[];
   signal?: AbortSignal;
   onToken?: (chunk: string) => void;
 };
@@ -121,6 +122,7 @@ const generateAnthropic = async ({
   credentials,
   system,
   prompt,
+  images = [],
   signal,
   onToken,
 }: GenerateOptions) => {
@@ -139,7 +141,10 @@ const generateAnthropic = async ({
       max_tokens: MAX_TOKENS,
       system,
       thinking: { type: "adaptive" },
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: [
+        {type:"text", text:prompt},
+        ...images.map((image) => ({type:"image" as const, source:{type:"base64" as const, media_type:image.type as "image/png"|"image/jpeg"|"image/webp", data:image.dataUrl.split(",",2)[1] ?? ""}})),
+      ]}],
     },
     { signal },
   );
@@ -168,7 +173,7 @@ const generateAnthropic = async ({
  * implementations — some omit `choices` on the final chunk, some send comments.
  */
 const generateOpenAiShaped = async (
-  { credentials, system, prompt, signal, onToken }: GenerateOptions,
+  { credentials, system, prompt, signal, onToken, images = [] }: GenerateOptions,
   baseUrl: string,
   label: string,
 ) => {
@@ -185,7 +190,10 @@ const generateOpenAiShaped = async (
       stream: true,
       messages: [
         { role: "system", content: system },
-        { role: "user", content: prompt },
+        { role: "user", content: images.length ? [
+          {type:"text",text:prompt},
+          ...images.map((image)=>({type:"image_url",image_url:{url:image.dataUrl}})),
+        ] : prompt },
       ],
     }),
   });
@@ -241,6 +249,7 @@ const generateGoogle = async ({
   credentials,
   system,
   prompt,
+  images = [],
   signal,
 }: GenerateOptions) => {
   const url =
@@ -256,7 +265,10 @@ const generateGoogle = async ({
     },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts: [
+        { text: prompt },
+        ...images.map((image)=>({inline_data:{mime_type:image.type,data:image.dataUrl.split(",",2)[1] ?? ""}})),
+      ] }],
       generationConfig: { maxOutputTokens: MAX_TOKENS },
     }),
   });

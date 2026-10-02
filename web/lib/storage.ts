@@ -18,6 +18,10 @@ export type SavedComposition = {
   source: string;
   /** The prompt that produced it, so a piece can be re-generated or explained. */
   prompt: string;
+  /** Local image data used by the composition; remains in this browser. */
+  assets?: import("./assets").UserAsset[];
+  brand?: import("./brand").BrandProfile;
+  direction?: import("./direction").Direction;
   createdAt: number;
   updatedAt: number;
 };

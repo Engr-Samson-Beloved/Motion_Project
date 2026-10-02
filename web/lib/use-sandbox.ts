@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { BrandProfile } from "./brand";
 import type { Direction } from "./direction";
+import type {AssetMap} from "./assets";
 import type { CompositionConfig } from "./compile";
 import {
   unwrap,
@@ -189,13 +190,14 @@ export const useSandbox = (frame: RefObject<HTMLIFrameElement | null>) => {
 
   /** Resolves with the compile outcome, so the repair loop can await it. */
   const load = useCallback(
-    (source: string, brand: BrandProfile, direction: Direction) => {
+    (source: string, brand: BrandProfile, direction: Direction, assets: AssetMap = {}) => {
       setState((s) => ({ ...s, error: null }));
       return request<CompileOutcome>((requestId) => ({
         type: "load",
         source,
         brand,
         direction,
+        assets,
         requestId,
       }));
     },

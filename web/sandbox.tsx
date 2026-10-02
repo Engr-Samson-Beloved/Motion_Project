@@ -19,6 +19,7 @@ import { Player } from "@remotion/player";
 import { compileComposition, type CompiledComposition } from "./lib/compile";
 import { checkSupport, renderToBlob } from "./lib/render";
 import { renderStills } from "./lib/stills";
+import { REMOTION_LICENSE_KEY } from "./lib/license";
 import {
   unwrap,
   wrap,
@@ -26,6 +27,36 @@ import {
   type ToSandbox,
 } from "./lib/sandbox-protocol";
 import "./sandbox.css";
+
+/**
+ * Remotion's renderer reads its user preferences through `window.localStorage`.
+ * Browsers throw for that API on an opaque-origin sandbox, even though the
+ * renderer only needs transient playback settings. Give it a private, in-memory
+ * store in this frame. The iframe remains sandboxed without `allow-same-origin`
+ * and nothing is persisted to the main app or the site origin.
+ */
+const installEphemeralStorage = () => {
+  const values = new Map<string, string>();
+  const storage: Storage = {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(String(key)) ?? null,
+    key: (index) => Array.from(values.keys())[index] ?? null,
+    removeItem: (key) => { values.delete(String(key)); },
+    setItem: (key, value) => { values.set(String(key), String(value)); },
+  };
+  try {
+    Object.defineProperty(window, "localStorage", {
+      configurable: false,
+      enumerable: true,
+      value: storage,
+    });
+  } catch {
+    // A browser that cannot install the shim will report its error at export.
+  }
+};
+
+installEphemeralStorage();
 
 const send = (message: FromSandbox) => {
   window.parent.postMessage(wrap(message), "*");
@@ -70,6 +101,7 @@ const Sandboxed = () => {
           message.source,
           message.brand,
           message.direction,
+          message.assets,
         );
       } catch (error) {
         setReady(null);
@@ -209,6 +241,7 @@ const Sandboxed = () => {
   return (
     <div className="sandbox-stage">
       <Player
+        acknowledgeRemotionLicense={Boolean(REMOTION_LICENSE_KEY)}
         key={sourceKey}
         component={ready.component}
         inputProps={{}}

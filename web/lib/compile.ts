@@ -31,6 +31,7 @@ import { brandModule, type BrandProfile } from "./brand";
 import { directionModule, type Direction } from "./direction";
 import { isDark } from "./brand";
 import { makeStageModule } from "./stage";
+import type {AssetMap} from "./assets";
 
 /**
  * The modules that are the same whatever brand is active.
@@ -73,9 +74,13 @@ const FIXED_MODULES: Readonly<Record<string, unknown>> = {
  * unforgeable rather than merely requested, and the same generated source
  * re-renders as any other brand by swapping what this function returns.
  */
-export const modulesFor = (brand: BrandProfile, direction: Direction) => ({
+export const modulesFor = (
+  brand: BrandProfile,
+  direction: Direction,
+  assets: AssetMap = {},
+) => ({
   ...FIXED_MODULES,
-  "@/brand": brandModule(brand),
+  "@/brand": brandModule(brand, assets),
   "@/direction": directionModule(direction, isDark(brand)),
   "@/stage": makeStageModule(brand, direction),
 });
@@ -153,9 +158,10 @@ export const compileComposition = (
   rawSource: string,
   brand: BrandProfile,
   direction: Direction,
+  assets: AssetMap = {},
 ): CompileResult => {
   const source = stripCodeFence(rawSource);
-  const modules = modulesFor(brand, direction);
+  const modules = modulesFor(brand, direction, assets);
 
   let code: string;
   try {

@@ -20,6 +20,7 @@
 import type { BrandProfile } from "./brand";
 import type { Direction } from "./direction";
 import type { CompositionConfig } from "./compile";
+import type {AssetMap} from "./assets";
 
 /** Nothing here may hold a function; everything is structured-cloneable. */
 export type ToSandbox =
@@ -28,6 +29,7 @@ export type ToSandbox =
       source: string;
       brand: BrandProfile;
       direction: Direction;
+      assets: AssetMap;
       requestId: string;
     }
   | { type: "render"; scale: number; requestId: string }

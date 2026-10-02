@@ -20,6 +20,7 @@ import {
 } from "@remotion/web-renderer";
 import type React from "react";
 import type { CompositionConfig } from "./compile";
+import { REMOTION_LICENSE_KEY } from "./license";
 
 export type RenderProgress = {
   /** 0 to 1. */
@@ -98,6 +99,7 @@ export const renderToBlob = async ({
     },
     inputProps: {},
     container: "mp4",
+    licenseKey: REMOTION_LICENSE_KEY || null,
     scale,
     signal,
     onProgress: ({ progress, encodedFrames }) => {

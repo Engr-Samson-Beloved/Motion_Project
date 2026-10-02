@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { FC, ReactNode } from "react";
 import { Player, Thumbnail } from "@remotion/player";
+import { REMOTION_LICENSE_KEY } from "./lib/license";
 
 /**
  * The studio carries a TSX compiler, the Anthropic SDK and the video encoder —
@@ -366,6 +367,7 @@ const Detail: FC<{ entry: RegistryEntry; onBack: () => void }> = ({
               />
             ) : (
               <Player
+                acknowledgeRemotionLicense={Boolean(REMOTION_LICENSE_KEY)}
                 {...componentProps(entry)}
                 inputProps={entry.defaultProps}
                 durationInFrames={entry.durationInFrames}

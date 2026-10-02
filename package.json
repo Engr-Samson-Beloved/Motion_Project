@@ -59,6 +59,7 @@
     "bed36": "node scripts/make-bed36.js",
     "bed16": "node scripts/make-bed16.js",
     "bed-update": "node scripts/make-bed-update.js",
+    "bed-verified": "node scripts/make-bed-verified.js",
     "screens": "node scripts/patch-screens.js",
     "probe-screens": "node scripts/probe-screens.js",
     "probe-clip": "node scripts/probe-clip.js",

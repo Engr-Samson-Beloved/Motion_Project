@@ -41,6 +41,11 @@ Never write a colour literal. Every colour comes from \`@/brand\`:
     BRAND.line     hairlines, borders, inactive states
     BRAND.warn     caution. BRAND.stop  failure. Never decoration.
 
+When provided, import {ASSETS, LOGO_SRC} from "@/brand". These are the user's
+reference images and selected logo; use exact filenames listed in the request,
+with Remotion's <Img src={ASSETS["filename.png"]}/> for photos. They were
+attached as visual references to this provider request.
+
 Copy is written in ${brand.voice === "caps" ? "UPPERCASE for display type" : "sentence case"}.
 ${brand.forbid.length ? `\nThis brand forbids:\n${brand.forbid.map((f) => `- ${f}`).join("\n")}` : ""}`;
 
@@ -131,6 +136,7 @@ Do NOT import fonts over the network, fetch anything, or use setTimeout/setInter
     import {AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Series} from "remotion";
 
 - AbsoluteFill for every full-frame layer. Layers stack in document order.
+- Use the Remotion Img component with ASSETS["filename.png"] to load an attached image reference; never put a data URL directly in generated source.
 - Timing constants named and grouped at the top of the file, not scattered as magic numbers: TITLE_IN, RULE_START, EXIT_LENGTH.
 - Derive the exit fade from durationInFrames so shortening a piece keeps its fade at the tail.
 - Inline styles. There is no CSS file and no Tailwind — every composition here styles with the style prop.

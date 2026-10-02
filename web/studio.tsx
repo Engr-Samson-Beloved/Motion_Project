@@ -7,8 +7,11 @@ import {
   BUILT_IN_BRANDS,
   SKNG_DARK,
   checkBrand,
+  loadCustomBrands,
+  saveCustomBrands,
   type BrandProfile,
 } from "./lib/brand";
+import {assetMap, prepareImageReference, readUserImage, type UserAsset} from "./lib/assets";
 import { DIRECTIONS, findDirection, type Direction } from "./lib/direction";
 import { EXAMPLE_NAME, EXAMPLE_SOURCE } from "./lib/example";
 import {
@@ -31,6 +34,7 @@ import {
   type SavedComposition,
 } from "./lib/storage";
 import { scaleFor, type RenderQuality } from "./lib/render";
+import { REMOTION_LICENSE_KEY } from "./lib/license";
 
 const DEFAULT_CREDENTIALS: Credentials = {
   provider: "google",
@@ -43,6 +47,21 @@ const EXAMPLES = [
   "A 10-second vertical title card: WEEK ONE lands hard, a green rule wipes under it, then a line about orientation week.",
   "15 seconds, dark: five dots find each other and wire into a network, then the word TOGETHER sets underneath.",
   "A 12-second countdown from 5 to 1, each numeral rolling over like an odometer, then RESULTS ARE OUT.",
+];
+
+const CREATIVE_STARTERS = [
+  {name:"Connected wireframe", direction:"documentary", prompt:"Tell a clear story with one continuous connected wireframe board. Draw fine lines between scenes and let the camera glide along them. Reveal the full system before the final call to action."},
+  {name:"Cinematic brand film", direction:"documentary", prompt:"Create a cinematic brand film with a vivid opening image, a human problem, an emotional turn, three rising visual beats, and a memorable final brand lockup. Use controlled camera movement, light, depth, and deliberate holds."},
+  {name:"Fast social reel", direction:"feed", prompt:"Create a high-energy vertical social video with a visual hook in the first second, bold kinetic typography, varied compositions, fast beat-timed cuts, and a clear final call to action."},
+  {name:"Product story", direction:"product", prompt:"Create a clean product story that begins with the audience problem, then reveals the product and demonstrates three benefits. Make each feature easy to read, and finish with one clear next step."},
+  {name:"Editorial manifesto", direction:"poster", prompt:"Create an editorial manifesto with expressive typography, a strong central idea, considered negative space, an intentional colour system, and a final brand sign-off."},
+];
+
+const CUSTOM_FONT_OPTIONS = [
+  "MontserratLocal, Montserrat, ui-sans-serif, system-ui, sans-serif",
+  'ui-sans-serif, system-ui, "Segoe UI", sans-serif',
+  'Georgia, "Times New Roman", serif',
+  '"Courier New", ui-monospace, monospace',
 ];
 
 /* ------------------------------------------------------------- key dialog */
@@ -239,7 +258,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [name, setName] = useState("Untitled");
 
-  const [brand, setBrand] = useState<BrandProfile>(SKNG_DARK);
+  const [customBrands, setCustomBrands] = useState<BrandProfile[]>(loadCustomBrands);
+  const brands = useMemo(() => [...BUILT_IN_BRANDS, ...customBrands], [customBrands]);
+  const [brand, setBrand] = useState<BrandProfile>(() => loadCustomBrands()[0] ?? SKNG_DARK);
+  const [assets, setAssets] = useState<UserAsset[]>([]);
+  const assetsByName = useMemo(() => assetMap(assets), [assets]);
   const [direction, setDirection] = useState<Direction>(() =>
     findDirection("feed"),
   );
@@ -279,7 +302,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const wantedBrand = params.get("brand");
     if (wantedBrand) {
-      const found = BUILT_IN_BRANDS.find((b) => b.id === wantedBrand);
+      const found = [...BUILT_IN_BRANDS, ...loadCustomBrands()].find((b) => b.id === wantedBrand);
       if (found) {
         setBrand(found);
       }
@@ -301,6 +324,8 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     saveCredentials(credentials);
   }, [credentials]);
 
+  useEffect(() => saveCustomBrands(customBrands), [customBrands]);
+
   const config = sandboxState.config;
 
   /**
@@ -311,9 +336,36 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
    */
   useEffect(() => {
     if (source) {
-      void loadSandbox(source, brand, direction);
+      void loadSandbox(source, brand, direction, assetsByName);
     }
-  }, [brand, direction, loadSandbox, source]);
+  }, [assetsByName, brand, direction, loadSandbox, source]);
+
+  const updateBrand = useCallback((patch: Partial<BrandProfile>) => {
+    const next = {...brand, ...patch};
+    setBrand(next);
+    if (next.id.startsWith("custom-")) {
+      setCustomBrands((prior) => prior.map((item) => item.id === next.id ? next : item));
+    }
+  }, [brand]);
+
+  const createBrand = useCallback(() => {
+    const next: BrandProfile = {...SKNG_DARK,id:`custom-${newId()}`,name:"My brand",forbid:[...SKNG_DARK.forbid]};
+    setCustomBrands((prior)=>[...prior,next]);setBrand(next);
+  }, []);
+
+  const addImages = useCallback(async (files: FileList | null) => {
+    if (!files?.length) return;
+    try {
+      const incoming = await Promise.all(Array.from(files).slice(0, Math.max(0,6-assets.length)).map(readUserImage));
+      setAssets((prior) => {
+        const names = new Set(prior.map((item) => item.name));
+        return [...prior, ...incoming.map((item) => {
+          const dot=item.name.lastIndexOf("."),stem=dot>0?item.name.slice(0,dot):item.name,ext=dot>0?item.name.slice(dot):"";
+          let name=item.name;for(let i=2;names.has(name);i++)name=`${stem}-${i}${ext}`;names.add(name);return {...item,name};
+        })];
+      });setError(null);
+    } catch (thrown) {setError(thrown instanceof Error?thrown.message:String(thrown));}
+  }, [assets.length]);
 
   const run = useCallback(
     async (userPrompt: string, mode: "create" | "edit") => {
@@ -326,19 +378,24 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
       generateAbort.current = controller;
 
       try {
+        const imageReferences = await Promise.all(assets.map(prepareImageReference));
+        const assetGuidance = assets.length
+          ? `\n\nLocal image assets: ${assets.map((asset) => `${asset.name} (${asset.type})`).join(", ")}. Import {ASSETS, LOGO_SRC} from "@/brand". Use the exact provided filename in <Img src={ASSETS["filename.png"]}/>; use LOGO_SRC for the selected brand logo. Do not embed image data in the source.`
+          : "";
+        const generationPrompt = mode === "edit" && source
+          ? `${editPreamble(source)}\n\nThe change: ${userPrompt}${assetGuidance}`
+          : `${userPrompt}${assetGuidance}`;
         const first = await generateComposition({
           credentials,
           system: systemPrompt(brand, direction),
-          prompt:
-            mode === "edit" && source
-              ? `${editPreamble(source)}\n\nThe change: ${userPrompt}`
-              : userPrompt,
+          prompt: generationPrompt,
+          images: imageReferences,
           signal: controller.signal,
           onToken: (chunk) => setStreamed((prior) => prior + chunk),
         });
 
         setSource(first);
-        let result = await loadSandbox(first, brand, direction);
+        let result = await loadSandbox(first, brand, direction, assetsByName);
 
         // One automatic repair. The model sees its own output and the error,
         // which fixes most first-attempt failures â€” a stray import, a missing
@@ -349,12 +406,13 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           const fixed = await generateComposition({
             credentials,
             system: systemPrompt(brand, direction),
-            prompt: repairPreamble(first, result.message),
+            prompt: `${repairPreamble(first, result.message)}${assetGuidance}`,
+            images: imageReferences,
             signal: controller.signal,
             onToken: (chunk) => setStreamed((prior) => prior + chunk),
           });
           setSource(fixed);
-          result = await loadSandbox(fixed, brand, direction);
+          result = await loadSandbox(fixed, brand, direction, assetsByName);
         }
 
         if (result.ok) {
@@ -378,7 +436,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         generateAbort.current = null;
       }
     },
-    [brand, credentials, direction, loadSandbox, source],
+    [assets, assetsByName, brand, credentials, direction, loadSandbox, source],
   );
 
   const onSave = useCallback(async () => {
@@ -391,13 +449,16 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
       name: name.trim() || "Untitled",
       source,
       prompt,
-      createdAt: now,
+      assets,
+      brand,
+      direction,
+      createdAt: saved.find((item) => item.id === (currentId ?? ""))?.createdAt ?? now,
       updatedAt: now,
     };
     await saveComposition(record);
     setCurrentId(record.id);
     setSaved(await listCompositions());
-  }, [currentId, name, prompt, source]);
+  }, [assets, brand, currentId, direction, name, prompt, saved, source]);
 
   const onExportSource = useCallback(() => {
     downloadBlob(
@@ -427,6 +488,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     setName(record.name);
     setSource(record.source);
     setPrompt(record.prompt);
+    setAssets(record.assets ?? []);
+    if (record.brand) setBrand(record.brand);
+    if (record.direction) setDirection(record.direction);
     setTab("preview");
     setError(null);
   }, []);
@@ -445,6 +509,26 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [config]);
 
   const hasKey = credentials.apiKey.trim().length > 0;
+
+  const exportBrand = useCallback(() => {
+    downloadBlob(new Blob([JSON.stringify(brand, null, 2)], {type:"application/json"}), `${slugify(brand.name)}-brand.json`);
+  }, [brand]);
+
+  const importBrand = useCallback(async (file?: File) => {
+    if (!file) return;
+    try {
+      if (file.size > 100_000) throw new Error("Brand files must be under 100 KB.");
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== "object") throw new Error("That file is not a brand profile.");
+      const candidate = parsed as BrandProfile;
+      const colorKeys = ["ground","ink","muted","accent","line","warn","stop"] as const;
+      if (!colorKeys.every((key) => /^#[0-9a-f]{6}$/i.test(String(candidate[key] ?? "")))) throw new Error("Brand colours must be six-digit hex values.");
+      if (typeof candidate.name !== "string" || candidate.name.length > 60) throw new Error("Add a brand name under 60 characters.");
+      if (!CUSTOM_FONT_OPTIONS.includes(candidate.headingFont)) throw new Error("Choose a supported display typeface.");
+      const next: BrandProfile = {...SKNG_DARK,...candidate,id:`custom-${newId()}`,logoAsset:undefined,headingFont:candidate.headingFont,bodyFont:SKNG_DARK.bodyFont,monoFont:SKNG_DARK.monoFont,headingTracking:SKNG_DARK.headingTracking,voice:candidate.voice==="caps"?"caps":"sentence",forbid:Array.isArray(candidate.forbid)?candidate.forbid.filter((x):x is string=>typeof x==="string").slice(0,12):[]};
+      setCustomBrands((prior)=>[...prior,next]);setBrand(next);setError(null);
+    } catch (thrown) { setError(thrown instanceof Error?thrown.message:String(thrown)); }
+  }, []);
 
   return (
     <div className="studio">
@@ -520,14 +604,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               <span>Brand</span>
               <select
                 value={brand.id}
-                onChange={(event) =>
-                  setBrand(
-                    BUILT_IN_BRANDS.find((b) => b.id === event.target.value) ??
-                      SKNG_DARK,
-                  )
-                }
+                onChange={(event) => setBrand(brands.find((b) => b.id === event.target.value) ?? SKNG_DARK)}
               >
-                {BUILT_IN_BRANDS.map((b) => (
+                {brands.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
@@ -551,6 +630,34 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               </select>
             </label>
           </div>
+
+          <div className="studio-tool-row">
+            <button type="button" className="ghost" onClick={createBrand}>＋ New brand</button>
+            <label className="ghost file-button">Import brand<input type="file" accept="application/json,.json" onChange={(event)=>{void importBrand(event.target.files?.[0]);event.currentTarget.value="";}}/></label>
+            <button type="button" className="ghost" onClick={exportBrand}>Export brand</button>
+          </div>
+
+          <details className="brand-editor" open={brand.id.startsWith("custom-")}>
+            <summary>Edit {brand.id.startsWith("custom-") ? "brand kit" : "brand copy"}</summary>
+            <label className="field"><span>Brand name</span><input value={brand.name} maxLength={60} onChange={(event)=>updateBrand({name:event.target.value})}/></label>
+            <div className="brand-colors">
+              {(["ground","ink","muted","accent","line","warn","stop"] as const).map((key)=><label key={key}><span>{key}</span><input type="color" aria-label={`${key} colour`} value={brand[key]} onChange={(event)=>updateBrand({[key]:event.target.value})}/><code>{brand[key]}</code></label>)}
+            </div>
+            <label className="field"><span>Display typeface</span><select value={brand.headingFont} onChange={(event)=>updateBrand({headingFont:event.target.value})}>{CUSTOM_FONT_OPTIONS.map((font)=><option key={font} value={font}>{font.split(",")[0].replace(/"/g,"")}</option>)}</select></label>
+            <label className="field"><span>Voice</span><select value={brand.voice} onChange={(event)=>updateBrand({voice:event.target.value as BrandProfile["voice"]})}><option value="sentence">Sentence case</option><option value="caps">Uppercase display</option></select></label>
+            {brand.id.startsWith("custom-")&&<button type="button" className="ghost danger" onClick={()=>{setCustomBrands((prior)=>prior.filter((item)=>item.id!==brand.id));setBrand(SKNG_DARK);}}>Delete this brand</button>}
+          </details>
+
+          <details className="creative-starters">
+            <summary>Creative starting points</summary>
+            <div className="starter-list">{CREATIVE_STARTERS.map((starter)=><button key={starter.name} type="button" className="example" onClick={()=>{setPrompt(starter.prompt);setDirection(findDirection(starter.direction as Direction["id"]));}}><strong>{starter.name}</strong><span>{starter.prompt}</span></button>)}</div>
+          </details>
+
+          <details className="asset-library" open={assets.length>0}>
+            <summary>Reference images · {assets.length}/6</summary>
+            <label className="field file-button">Add PNG, JPEG, or WebP<input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={assets.length>=6} onChange={(event)=>{void addImages(event.target.files);event.currentTarget.value="";}}/><small>Up to 5 MB each. When you generate, images are sent to your selected AI provider as visual references and kept in this browser for rendering.</small></label>
+            {assets.map((asset)=><div className="asset-row" key={asset.name}><img src={asset.dataUrl} alt=""/><span>{asset.name}</span><button type="button" className="x" aria-label={`Remove ${asset.name}`} onClick={()=>{setAssets((prior)=>prior.filter((item)=>item.name!==asset.name));if(brand.logoAsset===asset.name)updateBrand({logoAsset:undefined});}}>×</button><button type="button" className="ghost" onClick={()=>updateBrand({logoAsset:asset.name})}>{brand.logoAsset===asset.name?"Brand logo ✓":"Use as logo"}</button></div>)}
+          </details>
 
           <div className="axis-note">
             <span className="swatches" aria-hidden="true">
@@ -833,6 +940,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                 }}
               />
             </div>
+          ) : null}
+          {!REMOTION_LICENSE_KEY ? (
+            <p className="license-note">
+              Before publishing: check <a href="https://www.remotion.dev/license" target="_blank" rel="noreferrer">Remotion’s licence</a> for your use. Configure <code>VITE_REMOTION_LICENSE_KEY</code> in the deployment build if required.
+            </p>
           ) : null}
         </main>
       </div>

@@ -23,6 +23,8 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public");
 
 /** file in public/ -> how to get it back. */
 const REQUIRED = {
+  "bed-why60.mp3": "node scripts/make-bed-why60.js",
+  "bed-world50.mp3": "node scripts/make-bed-world50.js",
   "bed.mp3": "already committed; restore with `git checkout public/bed.mp3`",
   "bed16.mp3": "npm run bed16",
   "bed30.mp3": "npm run bed30",

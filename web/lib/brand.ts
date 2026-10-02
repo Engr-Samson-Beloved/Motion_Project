@@ -16,6 +16,8 @@
 export type BrandProfile = {
   id: string;
   name: string;
+  /** Optional filename from the user's private asset library. */
+  logoAsset?: string;
 
   /** The field everything sits on. Decides light vs dark treatment. */
   ground: string;
@@ -202,7 +204,10 @@ export const BUILT_IN_BRANDS: readonly BrandProfile[] = [
  * from the profile: no id, no voice, no prohibitions — those steer generation,
  * they are not values a composition draws with.
  */
-export const brandModule = (brand: BrandProfile) => ({
+export const brandModule = (
+  brand: BrandProfile,
+  assets: Readonly<Record<string, string>> = {},
+) => ({
   BRAND: {
     name: brand.name,
     ground: brand.ground,
@@ -218,4 +223,34 @@ export const brandModule = (brand: BrandProfile) => ({
   BODY_FONT: brand.bodyFont,
   MONO_FONT: brand.monoFont,
   HEADING_TRACKING: brand.headingTracking,
+  LOGO_SRC: brand.logoAsset ? assets[brand.logoAsset] ?? "" : "",
+  ASSETS: assets,
 });
+
+const CUSTOM_BRANDS_KEY = "motion-project.brands.v1";
+
+export const loadCustomBrands = (): BrandProfile[] => {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(CUSTOM_BRANDS_KEY) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is BrandProfile =>
+          item && typeof item === "object" &&
+          typeof item.id === "string" && item.id.startsWith("custom-") &&
+          typeof item.name === "string" &&
+          ["ground", "ink", "muted", "accent", "line", "warn", "stop"].every(
+            (key) => typeof item[key] === "string" && /^#[0-9a-f]{6}$/i.test(item[key]),
+          ),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveCustomBrands = (brands: readonly BrandProfile[]) => {
+  try {
+    localStorage.setItem(CUSTOM_BRANDS_KEY, JSON.stringify(brands));
+  } catch {
+    // The active brand remains usable for this session if storage is full.
+  }
+};

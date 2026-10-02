@@ -55,6 +55,9 @@ src/
                      captured: chrome, share sheet, keyboard, home screen.
     month/           9:16 16s monthly post, plus its still. Re-pointed by one
                      constant; the calendar is computed, not typeset.
+    verified/        9:16 30s fast cut. Dark. Sixteen cards of type; the
+                     camera steadies as the film goes on, and that is the
+                     argument.
     update/          9:16 30s monthly community update. Light. The member
                      count drawn as that many countable dots.
     three/           3D scenes.
@@ -67,6 +70,8 @@ public/
   bed38.mp3          38s arranged bed at 120 BPM, for CampusTour.
   bed36.mp3          36s arranged bed at 120 BPM, for AddToHome.
   bed16.mp3          16s arranged bed at 120 BPM, for NewMonth.
+  bed-verified.mp3   30s arranged bed at 120 BPM, for Verified. The only bed
+                     that uses `tension`, and the reason the parameter exists.
   bed-update.mp3     30s arranged bed at 120 BPM, for MonthlyUpdate. Named for
                      the piece because bed30.mp3 is SameQuestion's.
   screens/           Captured app screens (gitignored). See its README.
@@ -365,7 +370,18 @@ rather than with blank devices.
 One thing is unresolved and should be before the URL is public: **the Remotion
 licence.** `@remotion/player` asks for acknowledgement, and browser-side
 rendering (`@remotion/web-renderer`, already installed) takes a `licenseKey`.
-Check whether this use needs a company licence.
+Check whether this use needs a company licence. Once chosen, add
+`VITE_REMOTION_LICENSE_KEY` to the Vercel build environment; the app passes it
+to both preview and MP4 rendering. The key is part of the public static build,
+so it is a Remotion license key, never a secret API credential. Leaving it
+unset keeps the renderer usable for local evaluation but does not settle the
+licensing question.
+
+The Studio includes editable brand kits (colour roles, typeface, voice and logo),
+JSON brand import/export, creative starting points, and a local image library.
+Images stay in the browser for rendering and are attached to generation requests
+as visual references, so they are sent directly to the selected AI provider.
+Saved projects keep their assets and selected brand/direction in local IndexedDB.
 
 Verified in Chrome 152 against the production build: all 21 compositions load,
 20 render correctly, and `CinemaProbe` is the documented exception above.
@@ -1040,6 +1056,72 @@ node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -y \
   out/september-update-30s-share.mp4      # 1.0 MB
 ```
 
+### Verified — 1080x1920, 900 frames (30s)
+
+The fast cut. `src/skng/verified/`. The full script is the doc comment at the
+top of `script.ts` and should be read before this section.
+
+| Frames | Beat |
+|---|---|
+| 0–90 | Hard cut in, no fade. **WHO TOLD YOU?** |
+| 90–300 | The sources, accelerating: **A SENIOR. / A GROUP CHAT. / SOMEONE'S COUSIN. / NOBODY ACTUALLY KNOWS.** |
+| 303–390 | **CAMPUS RUNS ON RUMOUR.** |
+| 393–688 | The run — eight cuts, accelerating 43 → 30 frames, each ticked: your school, faculty, department, level, past questions, lecture notes, campus events, alumni |
+| 691–810 | **NOT A GROUP CHAT. / A VERIFIED NETWORK.** |
+| 810–900 | The mark, THE VERIFIED STUDENT NETWORK, `skoolconnectng.com` |
+
+Black flashes of three frames at 300, 390 and 688.
+
+**The camera is the argument.** `trust` on each cut is one number from 0 to 1,
+and colour, horizontal throw, tilt, chromatic aberration, grain, vignette and
+handheld intensity are *all* read off it. The film opens unsteady, split,
+thrown off-centre and grey; it ends locked, clean, centred and white. Nothing
+says so — it is simply the case that the first third moves and the last third
+does not, which is the difference between a rumour and a record, made in the
+language film has rather than asserted in a caption.
+
+Driving all seven off one number is the point, not tidiness. Seven ramps would
+drift apart the first time someone retimed a cut, and the effect only works
+while they agree.
+
+The grade steps **on** the cut rather than easing across it, which is how a
+film graded per shot behaves: within a shot the handheld noise is continuous,
+at the cut it jumps, because it is a different shot.
+
+There is no persistent furniture — no eyebrow, no rail, no rule holding the
+top of the frame. At this cut rate anything that survives a cut stops reading
+as part of the film and starts reading as a bug in the player. The brand
+appears once, at the end, and holds.
+
+`Lines` fits every line of a card to one shared size — the size that makes the
+*longest* line fit. Fitting each line independently is the obvious version and
+is wrong: "YOUR" and "DEPARTMENT." come out wildly different and read as two
+unrelated words instead of one sentence broken over two.
+
+`lib/cinema` ships `Slam`, which is a real trailing blur and looks better than
+what this uses. It re-renders its subtree once per trail layer, and a
+twelve-layer trail on sixteen cuts across nine hundred 1080x1920 frames
+multiplies the render by an order of magnitude to decorate something on screen
+for a sixth of a second. A CSS blur plus an overshoot buys the same read for
+one draw.
+
+```bash
+npm run bed-verified   # public/bed-verified.mp3, before the first render
+npx remotion render Verified out/skng-verified-30s.mp4
+```
+
+**The master is 69.3 MB** — the heaviest thirty seconds in the repo. Sixteen
+hard cuts are sixteen full scene changes, which is the worst case for an
+inter-frame codec, and grain at 0.16 gives it high-frequency detail to spend
+bitrate on in between. Keep a share copy:
+
+```bash
+node_modules/@remotion/compositor-win32-x64-msvc/ffmpeg.exe -y \
+  -i out/skng-verified-30s.mp4 -c:v libx264 -crf 28 -preset slow \
+  -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart \
+  out/skng-verified-30s-share.mp4      # 1.9 MB
+```
+
 ## Character animation — `src/lib/character/`
 
 A jointed 2D rig, hand-built, no dependencies and no asset files.
@@ -1390,6 +1472,7 @@ Verified end to end: install, eslint, `tsc`, bundling, and full renders.
 | `NewMonth` | `out/september-2026.mp4` | h264 1080x1920 30fps, 480 frames, 16.000s, AAC stereo, 12.9 MB |
 | `MonthPoster` | `out/september-2026-poster.png` | 1080x1920 still, 2.3 MB |
 | `MonthlyUpdate` | `out/september-update-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 44.7 MB |
+| `Verified` | `out/skng-verified-30s.mp4` | h264 1080x1920 30fps, 900 frames, 30.000s, AAC stereo, 69.3 MB |
 | `CharacterLab` | `out/character-lab.mp4` | h264 1920x1080 30fps, 180 frames, 6.000s, 136 kB |
 | `SkoolConnectPulse` | `out/skoolconnect-pulse-60s.mp4` | h264 1080x1920 30fps, 1800 frames, 60.000s, AAC stereo, 56.3 MB |
 | `CinemaProbe` | `out/cinema-probe.mp4` | h264 1080x1920 30fps, 300 frames, 10.000s, **+ AAC stereo**, 15.0 MB |

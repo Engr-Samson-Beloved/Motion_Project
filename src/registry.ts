@@ -17,6 +17,9 @@
  */
 
 import React from "react";
+import { WhyConnected, WhyBoard, WHY_DURATION } from "./skng/cinematic/WhyConnected";
+import { NextMove, NEXT_MOVE_DURATION } from "./skng/cinematic/NextMove";
+import { WorldVertical, WorldBoard, WORLD_DURATION } from "./skng/cinematic/WorldVertical";
 
 import {
   CHARACTER_SHEET_HEIGHT,
@@ -36,6 +39,7 @@ import {
   MONTHLY_UPDATE_DURATION,
   MonthlyUpdate,
 } from "./skng/update/MonthlyUpdate";
+import { VERIFIED_DURATION, Verified } from "./skng/verified/Verified";
 import {
   BOARD_HEIGHT as INSTALL_BOARD_HEIGHT,
   BOARD_WIDTH as INSTALL_BOARD_WIDTH,
@@ -187,6 +191,40 @@ const defineLazy = (entry: {
 });
 
 export const COMPOSITIONS: readonly RegistryEntry[] = [
+  define({id: "SkoolConnectWhyConnected", component: WhyConnected, durationInFrames: WHY_DURATION, width:1080, height:1920, kind:"social", title:"Why Connection Matters", blurb:"One continuous connected wireframe board. A sixty-second journey from scattered information to a clearer next step.", posterFrame:750}),
+  define({id:"SkoolConnectWhyBoard",component:WhyBoard,durationInFrames:1,width:968,height:1334,kind:"still",title:"Why Connection Matters · storyboard",blurb:"Twelve stops on one connected design board."}),
+  define({
+    id: "SkoolConnectWorldVertical",
+    component: WorldVertical,
+    durationInFrames: WORLD_DURATION,
+    width: 1080,
+    height: 1920,
+    kind: "social",
+    title: "Your World Just Got Bigger",
+    blurb: "Fifty seconds of dimensional cards, campus orbits and kinetic type. A fast vertical invitation to join SkoolConnectNG.",
+    posterFrame: 670,
+  }),
+  define({
+    id: "SkoolConnectWorldBoard",
+    component: WorldBoard,
+    durationInFrames: 1,
+    width: 1220,
+    height: 1366,
+    kind: "still",
+    title: "Your World · storyboard",
+    blurb: "Fifteen designed scenes from the fifty-second vertical film.",
+  }),
+  define({
+    id: "SkoolConnectNextMove",
+    component: NextMove,
+    durationInFrames: NEXT_MOVE_DURATION,
+    width: 1920,
+    height: 1080,
+    kind: "film",
+    title: "The Next Move",
+    blurb: "A cinematic thirty-second invitation to connect, discover and belong. Real product screens and a clear destination: skoolconnect.ng.",
+    posterFrame: 500,
+  }),
   define({
     id: "SkoolConnectStory",
     component: SkoolConnectStory,
@@ -289,6 +327,19 @@ export const COMPOSITIONS: readonly RegistryEntry[] = [
     blurb:
       "The month turns over, the word sets, and a real calendar grid fills in behind it. Re-pointed by one constant.",
     posterFrame: 250,
+  }),
+
+  define({
+    id: "Verified",
+    component: Verified,
+    durationInFrames: VERIFIED_DURATION,
+    width: 1080,
+    height: 1920,
+    kind: "film",
+    title: "Verified",
+    blurb:
+      "Sixteen cards of type in thirty seconds. It opens handheld, split and grey on \"WHO TOLD YOU?\", and ends locked, clean and centred — the camera steadying is the argument.",
+    posterFrame: 262,
   }),
 
   define({
