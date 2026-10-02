@@ -842,6 +842,9 @@ code {
 }
 
 .error-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   margin: 14px 20px 0;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
@@ -855,6 +858,8 @@ code {
   overflow-x: auto;
   border-radius: 3px;
 }
+.error-bar > span { flex:1; min-width:0; }
+.error-bar > button { flex:0 0 auto; }
 
 .stage {
   position: relative;

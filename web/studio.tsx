@@ -468,6 +468,47 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [brand.name, brand.voice, busy, credentials, direction.name, direction.note, hasKey, prompt]);
 
+  const fixRuntimeError = useCallback(async () => {
+    const runtimeError = sandboxState.error;
+    if (!source || !hasKey || busy || runtimeError?.stage !== "runtime") return;
+    setError(null);
+    setBusy("repairing");
+    setStreamed("");
+    setTab("source");
+    const controller = new AbortController();
+    generateAbort.current = controller;
+    try {
+      const imageReferences = await Promise.all(assets.map(prepareImageReference));
+      const assetGuidance = assets.length
+        ? `\n\nAvailable image filenames: ${assets.map((asset) => asset.name).join(", ")}. Use only these exact ASSETS filenames; every Img must receive a valid src.`
+        : "\n\nNo image assets were provided. Remove every Img component and build visuals from available shapes and typography instead.";
+      const fixed = await generateComposition({
+        credentials,
+        system: systemPrompt(brand, direction),
+        prompt: `${repairPreamble(source, runtimeError.message)}${assetGuidance}`,
+        images: imageReferences,
+        signal: controller.signal,
+        onToken: (chunk) => setStreamed((prior) => prior + chunk),
+      });
+      setSource(fixed);
+      const result = await loadSandbox(fixed, brand, direction, assetsByName);
+      if (result.ok) {
+        setError(null);
+        setTab("preview");
+      } else {
+        setError(`${result.stage}: ${result.message}`);
+      }
+    } catch (thrown) {
+      if (!controller.signal.aborted) {
+        setError(thrown instanceof Error ? thrown.message : String(thrown));
+      }
+    } finally {
+      setBusy(null);
+      setStreamed("");
+      generateAbort.current = null;
+    }
+  }, [assets, assetsByName, brand, busy, credentials, direction, hasKey, loadSandbox, sandboxState.error, source]);
+
   const onSave = useCallback(async () => {
     if (!source) {
       return;
@@ -845,8 +886,12 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
           {error ?? sandboxState.error ? (
             <div className="error-bar">
-              {error ??
-                `${sandboxState.error?.stage}: ${sandboxState.error?.message}`}
+              <span>{error ?? `${sandboxState.error?.stage}: ${sandboxState.error?.message}`}</span>
+              {!error && sandboxState.error?.stage === "runtime" && source ? (
+                <button type="button" className="ghost" disabled={!hasKey || busy !== null} onClick={() => void fixRuntimeError()}>
+                  {busy === "repairing" ? "Repairing…" : "Fix with AI"}
+                </button>
+              ) : null}
             </div>
           ) : null}
 
