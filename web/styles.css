@@ -662,6 +662,8 @@ code {
   color: #5c6b78;
   font-size: 12px;
 }
+.prompt-tools { display:flex; align-items:center; gap:10px; margin-top:-12px; }
+.prompt-tools small { color:var(--muted); font-size:11px; line-height:1.35; }
 .field textarea,
 .field input,
 .field select,

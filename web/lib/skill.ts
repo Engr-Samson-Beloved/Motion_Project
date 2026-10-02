@@ -171,6 +171,8 @@ each role means. The font is already loaded; never fetch one.
 @/character — a jointed 2D rig, no assets:
     <Character pose={walk(frame, fps)} size={520} color={BRAND.ink} farColor={BRAND.muted} />
     poses: walk(frame, fps, speed?), idle, wave, study, blendPose(a, b, t)
+Always provide a pose returned by one of those helpers. Never pass null or
+undefined as pose; both inputs to blendPose must be complete poses.
 
 # Rhythm
 

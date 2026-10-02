@@ -91,6 +91,7 @@ export type GenerateOptions = {
   system: string;
   prompt: string;
   images?: {name: string; dataUrl: string; type: string}[];
+  maxTokens?: number;
   signal?: AbortSignal;
   onToken?: (chunk: string) => void;
 };
@@ -123,6 +124,7 @@ const generateAnthropic = async ({
   system,
   prompt,
   images = [],
+  maxTokens = MAX_TOKENS,
   signal,
   onToken,
 }: GenerateOptions) => {
@@ -138,7 +140,7 @@ const generateAnthropic = async ({
   const stream = client.messages.stream(
     {
       model: credentials.model,
-      max_tokens: MAX_TOKENS,
+      max_tokens: maxTokens,
       system,
       thinking: { type: "adaptive" },
       messages: [{ role: "user", content: [
@@ -173,7 +175,7 @@ const generateAnthropic = async ({
  * implementations — some omit `choices` on the final chunk, some send comments.
  */
 const generateOpenAiShaped = async (
-  { credentials, system, prompt, signal, onToken, images = [] }: GenerateOptions,
+  { credentials, system, prompt, signal, onToken, images = [], maxTokens = MAX_TOKENS }: GenerateOptions,
   baseUrl: string,
   label: string,
 ) => {
@@ -186,7 +188,7 @@ const generateOpenAiShaped = async (
     },
     body: JSON.stringify({
       model: credentials.model,
-      max_completion_tokens: MAX_TOKENS,
+      max_completion_tokens: maxTokens,
       stream: true,
       messages: [
         { role: "system", content: system },
@@ -250,6 +252,7 @@ const generateGoogle = async ({
   system,
   prompt,
   images = [],
+  maxTokens = MAX_TOKENS,
   signal,
 }: GenerateOptions) => {
   const url =
@@ -269,7 +272,7 @@ const generateGoogle = async ({
         { text: prompt },
         ...images.map((image)=>({inline_data:{mime_type:image.type,data:image.dataUrl.split(",",2)[1] ?? ""}})),
       ] }],
-      generationConfig: { maxOutputTokens: MAX_TOKENS },
+      generationConfig: { maxOutputTokens: maxTokens },
     }),
   });
 

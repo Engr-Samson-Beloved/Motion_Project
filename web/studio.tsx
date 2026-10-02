@@ -249,7 +249,8 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const [prompt, setPrompt] = useState("");
   const [source, setSource] = useState("");
 
-  const [busy, setBusy] = useState<null | "generating" | "repairing">(null);
+  const [busy, setBusy] = useState<null | "generating" | "repairing" | "refining">(null);
+  const hasKey = credentials.apiKey.trim().length > 0;
   const [streamed, setStreamed] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"preview" | "source">("preview");
@@ -439,6 +440,34 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     [assets, assetsByName, brand, credentials, direction, loadSandbox, source],
   );
 
+  const refinePrompt = useCallback(async () => {
+    const draft = prompt.trim();
+    if (!draft || !hasKey || busy) return;
+    setError(null);
+    setBusy("refining");
+    const controller = new AbortController();
+    generateAbort.current = controller;
+    try {
+      const refined = await generateComposition({
+        credentials,
+        system: `You are a creative brief editor for a motion-design video generator. Rewrite the user's rough idea into one clear, vivid, actionable prompt that the video system can execute. Preserve their subject, goal, facts, names, and requested call to action. Do not invent product features, statistics, or promises. Make the opening hook, visual progression, motion language, text hierarchy, pacing, and ending clear where useful. Keep it concise (about 70–140 words). Respect the selected brand and creative direction. Return only the refined prompt as plain text; never return code, analysis, or a preamble.`,
+        prompt: `Selected brand: ${brand.name}; voice: ${brand.voice}.\nCreative direction: ${direction.name} — ${direction.note}\n\nUser's draft:\n${draft}`,
+        maxTokens: 1200,
+        signal: controller.signal,
+      });
+      const cleaned = refined.trim().replace(/^```(?:text)?\s*|\s*```$/g, "");
+      if (!cleaned) throw new Error("The provider returned an empty prompt. Try again.");
+      setPrompt(cleaned);
+    } catch (thrown) {
+      if (!controller.signal.aborted) {
+        setError(thrown instanceof Error ? thrown.message : String(thrown));
+      }
+    } finally {
+      setBusy(null);
+      generateAbort.current = null;
+    }
+  }, [brand.name, brand.voice, busy, credentials, direction.name, direction.note, hasKey, prompt]);
+
   const onSave = useCallback(async () => {
     if (!source) {
       return;
@@ -508,8 +537,6 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     return `${config.width}x${config.height} · ${seconds.toFixed(1)}s · ${config.fps}fps`;
   }, [config]);
 
-  const hasKey = credentials.apiKey.trim().length > 0;
-
   const exportBrand = useCallback(() => {
     downloadBlob(new Blob([JSON.stringify(brand, null, 2)], {type:"application/json"}), `${slugify(brand.name)}-brand.json`);
   }, [brand]);
@@ -578,6 +605,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             <textarea
               rows={6}
               value={prompt}
+              disabled={busy === "refining"}
               placeholder={
                 source
                   ? "Make the title land harder and hold two seconds longer."
@@ -592,6 +620,18 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               }}
             />
           </label>
+
+          <div className="prompt-tools">
+            <button
+              type="button"
+              className="ghost"
+              disabled={!prompt.trim() || !hasKey || busy !== null}
+              onClick={() => void refinePrompt()}
+            >
+              {busy === "refining" ? "Refining brief…" : "✦ Refine prompt"}
+            </button>
+            <small>{hasKey ? "Uses your selected model; provider charges may apply. This won’t create a video." : "Add your API key to refine with AI."}</small>
+          </div>
 
           {/*
             Brand and Direction are the two axes the whole tool turns on: the
@@ -713,11 +753,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           </div>
 
           {busy ? (
-            <p className="status">
+            <p className="status" aria-live="polite">
               {busy === "repairing"
                 ? "That did not compile â€” asking for a fix"
-                : "Writing"}
-              <span className="counter">{streamed.length} chars</span>
+                : busy === "refining" ? "Clarifying your brief" : "Writing"}
+              {busy !== "refining" ? <span className="counter">{streamed.length} chars</span> : null}
             </p>
           ) : null}
 

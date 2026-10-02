@@ -1,5 +1,7 @@
 import React from "react";
 import type { Pose } from "./cycles";
+import { idle } from "./cycles";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 
 /**
  * A jointed 2D character, drawn as nested SVG rotations.
@@ -121,6 +123,17 @@ export type CharacterProps = {
   style?: React.CSSProperties;
 };
 
+const isPose = (value: unknown): value is Pose => {
+  if (!value || typeof value !== "object") return false;
+  const pose = value as Partial<Pose>;
+  const pair = (candidate: unknown) => Array.isArray(candidate) &&
+    candidate.length === 2 && candidate.every((angle) => typeof angle === "number" && Number.isFinite(angle));
+  return typeof pose.bob === "number" && Number.isFinite(pose.bob) &&
+    typeof pose.lean === "number" && Number.isFinite(pose.lean) &&
+    typeof pose.headTilt === "number" && Number.isFinite(pose.headTilt) &&
+    pair(pose.hip) && pair(pose.knee) && pair(pose.shoulder) && pair(pose.elbow);
+};
+
 export const Character: React.FC<CharacterProps> = ({
   pose,
   size = 220,
@@ -131,6 +144,12 @@ export const Character: React.FC<CharacterProps> = ({
   opacity = 1,
   style,
 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  // Model-authored scenes occasionally produce a null pose. Keep the frame
+  // renderable and deterministic, with a living idle fallback, instead of
+  // failing on pose.bob halfway through preview or export.
+  const resolvedPose = isPose(pose) ? pose : idle(frame, fps);
   const far = farColor ?? color;
   const legW = 13;
   const armW = 10;
@@ -145,18 +164,18 @@ export const Character: React.FC<CharacterProps> = ({
       <g
         transform={
           (flip ? `translate(${RIG_WIDTH} 0) scale(-1 1) ` : "") +
-          `translate(0 ${pose.bob})`
+          `translate(0 ${resolvedPose.bob})`
         }
       >
         {/* Draw order is the depth: far limbs, then the body, then near ones. */}
-        <Leg hip={pose.hip[1]} knee={pose.knee[1]} color={far} width={legW} />
-        <Leg hip={pose.hip[0]} knee={pose.knee[0]} color={color} width={legW} />
+        <Leg hip={resolvedPose.hip[1]} knee={resolvedPose.knee[1]} color={far} width={legW} />
+        <Leg hip={resolvedPose.hip[0]} knee={resolvedPose.knee[0]} color={color} width={legW} />
 
         {/* Arms and head lean with the torso; legs do not. */}
-        <g transform={`rotate(${pose.lean} ${HIP_X} ${HIP_Y})`}>
+        <g transform={`rotate(${resolvedPose.lean} ${HIP_X} ${HIP_Y})`}>
           <Arm
-            shoulder={pose.shoulder[1]}
-            elbow={pose.elbow[1]}
+            shoulder={resolvedPose.shoulder[1]}
+            elbow={resolvedPose.elbow[1]}
             color={far}
             width={armW}
             side={-1}
@@ -164,7 +183,7 @@ export const Character: React.FC<CharacterProps> = ({
 
           <Limb from={HIP_Y} to={TORSO_TOP_Y} color={color} width={28} />
 
-          <g transform={`rotate(${pose.headTilt} ${HIP_X} ${NECK_Y})`}>
+          <g transform={`rotate(${resolvedPose.headTilt} ${HIP_X} ${NECK_Y})`}>
             <circle cx={HIP_X} cy={HEAD_Y} r={HEAD_R} fill={color} />
             {/*
               A cap is a dome that follows the skull plus a brim. Drawn as a
@@ -202,8 +221,8 @@ export const Character: React.FC<CharacterProps> = ({
           </g>
 
           <Arm
-            shoulder={pose.shoulder[0]}
-            elbow={pose.elbow[0]}
+            shoulder={resolvedPose.shoulder[0]}
+            elbow={resolvedPose.elbow[0]}
             color={color}
             width={armW}
             side={1}
