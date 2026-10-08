@@ -389,7 +389,7 @@ const listOpenAiShaped = async (
 export const listModels = async (
   credentials: Credentials,
 ): Promise<string[]> => {
-  if (credentials.provider === "hosted") return [credentials.model || "openai/gpt-4o"];
+  if (credentials.provider === "hosted") return [credentials.model || "openrouter/free"];
   if (!credentials.apiKey.trim()) {
     throw new Error("Add an API key first.");
   }

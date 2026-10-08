@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 const UPSTREAM = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BODY_BYTES = 15 * 1024 * 1024;
 const MAX_OUTPUT_TOKENS = 12000;
+const DEFAULT_MODEL = "openrouter/free";
 const WINDOW_MS = 60_000;
 const REQUESTS_PER_WINDOW = 8;
 
@@ -61,7 +62,7 @@ export const handleAi = async (req: RequestWithBody, res: ServerResponse, key = 
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
-    res.end(JSON.stringify({ available: Boolean(key), model: process.env.OPENROUTER_MODEL || "openai/gpt-4o" }));
+    res.end(JSON.stringify({ available: Boolean(key), model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL }));
     return;
   }
   if (req.method !== "POST") return reply(res, 405, "Use POST to generate a video.");
@@ -96,7 +97,7 @@ export const handleAi = async (req: RequestWithBody, res: ServerResponse, key = 
         "X-Title": "Motion Studio",
       },
       body: JSON.stringify({
-        model: process.env.OPENROUTER_MODEL || "openai/gpt-4o",
+        model: process.env.OPENROUTER_MODEL || DEFAULT_MODEL,
         max_tokens: maxTokens,
         stream: true,
         messages: [
@@ -109,6 +110,9 @@ export const handleAi = async (req: RequestWithBody, res: ServerResponse, key = 
       const detail = await upstream.text().catch(() => "");
       let message = "The hosted model is unavailable. Try again shortly.";
       try { message = (JSON.parse(detail) as { error?: { message?: string } }).error?.message || message; } catch { /* Upstream returned non-JSON. */ }
+      if (upstream.status === 402) {
+        message = "Included AI has run out of credits for its selected model. The site owner can add OpenRouter credits or switch OPENROUTER_MODEL to openrouter/free. You can also use your own provider key in Studio.";
+      }
       return reply(res, upstream.status || 502, message);
     }
     res.statusCode = 200;
