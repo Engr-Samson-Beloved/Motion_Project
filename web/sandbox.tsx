@@ -87,6 +87,13 @@ const Sandboxed = () => {
       return;
     }
 
+    if (message.type === "clear") {
+      renderAbort.current?.abort();
+      setReady(null);
+      setSourceKey("");
+      return;
+    }
+
     if (message.type === "load") {
       /*
         Wrapped because `compileComposition` only catches what happens inside

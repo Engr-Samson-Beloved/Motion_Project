@@ -1,0 +1,18 @@
+SKOOLCONNECTNG — SAME QUESTION
+Composition: SameQuestion | 30 seconds | Vertical 9:16
+Format: visual-led character film, no product UI. Seven students on separate
+campuses encounter the same question; one connected answer travels between
+them. SameQuestion.tsx supplies the question glyph and answer beats.
+
+00:00–00:06  Seven students, each in their own campus space.
+00:06–00:12  The same question appears above one student, then another.
+00:12–00:20  A glowing connection carries the answer across the network.
+00:20–00:26  The answer reaches all seven; their question marks resolve.
+00:26–00:30  They wave across the connected world.
+
+End card: SkoolConnectNG
+Connect. Discover. Grow together.
+skoolconnect.ng
+
+Keep the camera in one continuous move. Let the characters and connecting
+lines carry the story; avoid adding UI panels that break the film's human tone.

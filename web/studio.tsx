@@ -2,6 +2,7 @@
 import type { FC } from "react";
 
 import { useSandbox } from "./lib/use-sandbox";
+import { productionBrief } from "./lib/brief";
 import { editPreamble, repairPreamble, systemPrompt } from "./lib/skill";
 import {
   BUILT_IN_BRANDS,
@@ -19,8 +20,6 @@ import {
   clearCredentials,
   generateComposition,
   listModels,
-  loadCredentials,
-  saveCredentials,
   type Credentials,
   type ProviderId,
 } from "./lib/providers";
@@ -34,12 +33,13 @@ import {
   type SavedComposition,
 } from "./lib/storage";
 import { scaleFor, type RenderQuality } from "./lib/render";
+import { sampleFrames } from "./lib/stills";
 import { REMOTION_LICENSE_KEY } from "./lib/license";
 
 const DEFAULT_CREDENTIALS: Credentials = {
-  provider: "google",
+  provider: "hosted",
   apiKey: "",
-  model: "gemini-3.5-flash",
+  model: "openai/gpt-4o",
   baseUrl: "",
 };
 
@@ -72,6 +72,7 @@ const SettingsPanel: FC<{
   onClose: () => void;
 }> = ({ credentials, onChange, onClose }) => {
   const provider = PROVIDERS.find((p) => p.id === credentials.provider);
+  const hosted = credentials.provider === "hosted";
 
   const [models, setModels] = useState<string[] | null>(null);
   const [checking, setChecking] = useState(false);
@@ -112,11 +113,9 @@ const SettingsPanel: FC<{
         </button>
       </div>
 
-      <p className="sheet-note">
-        The key goes straight from this page to the provider. It is never sent
-        anywhere else, never stored on a server, and is dropped when you close
-        the tab.
-      </p>
+      <p className="sheet-note">{hosted
+        ? "Included AI is ready to use. You can switch to your own provider if you prefer."
+        : "Your personal key goes straight from this page to the provider and is dropped when you close the tab."}</p>
 
       <label className="field">
         <span>Provider</span>
@@ -154,7 +153,7 @@ const SettingsPanel: FC<{
         </label>
       ) : null}
 
-      <label className="field">
+      {!hosted ? <label className="field">
         <span>API key</span>
         <input
           type="password"
@@ -167,9 +166,9 @@ const SettingsPanel: FC<{
           }
         />
         <small>{provider?.keyHint}</small>
-      </label>
+      </label> : null}
 
-      <div className="check-row">
+      {!hosted ? <div className="check-row">
         <button
           type="button"
           className="ghost"
@@ -183,11 +182,11 @@ const SettingsPanel: FC<{
             Key works â€” {models.length} model{models.length === 1 ? "" : "s"}
           </span>
         ) : null}
-      </div>
+      </div> : null}
 
       {checkError ? <p className="check-error">{checkError}</p> : null}
 
-      <label className="field">
+      {!hosted ? <label className="field">
         <span>Model</span>
         {models && models.length > 0 ? (
           <select
@@ -217,10 +216,10 @@ const SettingsPanel: FC<{
             ? "Live from the provider â€” these are the ones this key can reach."
             : "Test the key to replace this with the models it can actually reach."}
         </small>
-      </label>
+      </label> : null}
 
       <div className="sheet-actions">
-        <button
+        {!hosted ? <button
           type="button"
           className="ghost danger"
           onClick={() => {
@@ -228,8 +227,8 @@ const SettingsPanel: FC<{
             onChange({ ...DEFAULT_CREDENTIALS });
           }}
         >
-          Forget key
-        </button>
+          Forget key and use Included AI
+        </button> : null}
         <button type="button" className="primary" onClick={onClose}>
           Done
         </button>
@@ -241,16 +240,17 @@ const SettingsPanel: FC<{
 /* -------------------------------------------------------------- the page */
 
 export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
-  const [credentials, setCredentials] = useState<Credentials>(
-    () => loadCredentials() ?? DEFAULT_CREDENTIALS,
-  );
+  const [credentials, setCredentials] = useState<Credentials>(() => ({...DEFAULT_CREDENTIALS}));
   const [showSettings, setShowSettings] = useState(false);
 
   const [prompt, setPrompt] = useState("");
+  const [sourcePrompt, setSourcePrompt] = useState("");
   const [source, setSource] = useState("");
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
-  const [busy, setBusy] = useState<null | "generating" | "repairing" | "refining">(null);
-  const hasKey = credentials.apiKey.trim().length > 0;
+  const [busy, setBusy] = useState<null | "generating" | "repairing" | "refining" | "polishing">(null);
+  const [hostedAvailable, setHostedAvailable] = useState<boolean | null>(null);
+  const hasKey = credentials.provider === "hosted" ? hostedAvailable === true : credentials.apiKey.trim().length > 0;
   const [streamed, setStreamed] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"preview" | "source">("preview");
@@ -285,11 +285,22 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     state: sandboxState,
     load: loadSandbox,
     render: renderSandbox,
+    stills: captureStills,
     cancelRender,
+    clear: clearSandbox,
   } = useSandbox(frameRef);
 
   useEffect(() => {
     void listCompositions().then(setSaved);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/ai", {cache:"no-store"})
+      .then((response) => response.ok ? response.json() as Promise<{available?: boolean}> : Promise.reject(new Error("Hosted AI unavailable")))
+      .then((status) => { if (active) setHostedAvailable(status.available === true); })
+      .catch(() => { if (active) setHostedAvailable(false); });
+    return () => { active = false; };
   }, []);
 
   /**
@@ -321,9 +332,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, []);
 
-  useEffect(() => {
-    saveCredentials(credentials);
-  }, [credentials]);
+  useEffect(() => { clearCredentials(); }, []);
 
   useEffect(() => saveCustomBrands(customBrands), [customBrands]);
 
@@ -371,6 +380,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const run = useCallback(
     async (userPrompt: string, mode: "create" | "edit") => {
       setError(null);
+      setSaveNotice(null);
       setBusy("generating");
       setStreamed("");
       setTab("source");
@@ -385,7 +395,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           : "";
         const generationPrompt = mode === "edit" && source
           ? `${editPreamble(source)}\n\nThe change: ${userPrompt}${assetGuidance}`
-          : `${userPrompt}${assetGuidance}`;
+          : `${productionBrief(userPrompt, assets.length > 0)}${assetGuidance}`;
         const first = await generateComposition({
           credentials,
           system: systemPrompt(brand, direction),
@@ -421,7 +431,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           if (mode === "create") {
             setName(userPrompt.slice(0, 48) || "Untitled");
             setCurrentId(null);
+            setSourcePrompt(userPrompt);
           }
+          setPrompt("");
         } else {
           setError(`${result.stage}: ${result.message}`);
         }
@@ -509,6 +521,67 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     }
   }, [assets, assetsByName, brand, busy, credentials, direction, hasKey, loadSandbox, sandboxState.error, source]);
 
+  const polishVisuals = useCallback(async () => {
+    if (!source || !config || !hasKey || busy) return;
+    setBusy("polishing");
+    setError(null);
+    setSaveNotice(null);
+    setStreamed("");
+    const controller = new AbortController();
+    generateAbort.current = controller;
+    try {
+      const frames = sampleFrames(config.durationInFrames);
+      const rendered = await captureStills(frames);
+      const references = rendered.map((dataUrl, index) => ({
+        name: `current-video-${Math.round(frames[index] / config.fps)}s.jpg`,
+        dataUrl,
+        type: "image/jpeg",
+      }));
+      const instructions = `${editPreamble(source)}\n\nCreative review: The attached images are actual frames rendered from the CURRENT composition at different moments. Improve the visual result substantially while preserving the user's subject, facts, duration, aspect ratio, brand and call to action. Identify the weakest layouts yourself and fix them in code. Give the film one distinctive visual metaphor; use richer depth, specific graphic elements, varied scale, purposeful camera or object movement, and transitions that connect shots. Improve readability and visual hierarchy. Avoid repeated centered title cards, plain backgrounds, generic grids, and random decoration. Keep every Img src valid and use only supplied asset filenames. Return the complete updated TSX file, with no commentary.`;
+      let revised: string;
+      try {
+        revised = await generateComposition({
+          credentials, system: systemPrompt(brand, direction), prompt: instructions,
+          images: references, signal: controller.signal,
+          onToken: (chunk) => setStreamed((prior) => prior + chunk),
+        });
+      } catch (thrown) {
+        const message = thrown instanceof Error ? thrown.message : String(thrown);
+        if (controller.signal.aborted || !/image|vision|multimodal|unsupported content/i.test(message)) throw thrown;
+        setStreamed("");
+        revised = await generateComposition({
+          credentials, system: systemPrompt(brand, direction),
+          prompt: `${instructions}\n\nThis model cannot inspect the rendered frames. Diagnose and improve the visual design from the source code and brief alone.`,
+          signal: controller.signal,
+          onToken: (chunk) => setStreamed((prior) => prior + chunk),
+        });
+      }
+      if (revised.trim() === source.trim()) throw new Error("The model returned the same design. Describe a specific change and try again.");
+      let result = await loadSandbox(revised, brand, direction, assetsByName);
+      if (!result.ok) {
+        setStreamed("");
+        revised = await generateComposition({
+          credentials, system: systemPrompt(brand, direction),
+          prompt: repairPreamble(revised, result.message), signal: controller.signal,
+          onToken: (chunk) => setStreamed((prior) => prior + chunk),
+        });
+        result = await loadSandbox(revised, brand, direction, assetsByName);
+      }
+      if (!result.ok) {
+        await loadSandbox(source, brand, direction, assetsByName);
+        throw new Error(`Visual revision failed to compile: ${result.message}`);
+      }
+      setSource(revised);
+      setTab("preview");
+    } catch (thrown) {
+      if (!controller.signal.aborted) setError(thrown instanceof Error ? thrown.message : String(thrown));
+    } finally {
+      setBusy(null);
+      setStreamed("");
+      generateAbort.current = null;
+    }
+  }, [assetsByName, brand, busy, captureStills, config, credentials, direction, hasKey, loadSandbox, source]);
+
   const onSave = useCallback(async () => {
     if (!source) {
       return;
@@ -518,17 +591,22 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
       id: currentId ?? newId(),
       name: name.trim() || "Untitled",
       source,
-      prompt,
+      prompt: sourcePrompt,
       assets,
       brand,
       direction,
       createdAt: saved.find((item) => item.id === (currentId ?? ""))?.createdAt ?? now,
       updatedAt: now,
     };
-    await saveComposition(record);
+    const persisted = await saveComposition(record);
+    if (!persisted) {
+      setError("This browser could not save the design. Export the source to keep a copy.");
+      return;
+    }
     setCurrentId(record.id);
     setSaved(await listCompositions());
-  }, [assets, brand, currentId, direction, name, prompt, saved, source]);
+    setSaveNotice("Saved in this browser");
+  }, [assets, brand, currentId, direction, name, sourcePrompt, saved, source]);
 
   const onExportSource = useCallback(() => {
     downloadBlob(
@@ -557,12 +635,14 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     setCurrentId(record.id);
     setName(record.name);
     setSource(record.source);
-    setPrompt(record.prompt);
+    setSourcePrompt(record.prompt);
+    setPrompt("");
     setAssets(record.assets ?? []);
     if (record.brand) setBrand(record.brand);
     if (record.direction) setDirection(record.direction);
     setTab("preview");
     setError(null);
+    setSaveNotice(null);
   }, []);
 
   // Contrast failures are invisible in a profile and obvious in a frame. The
@@ -598,6 +678,21 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     } catch (thrown) { setError(thrown instanceof Error?thrown.message:String(thrown)); }
   }, []);
 
+  const resetDesign = useCallback(() => {
+    if (busy) return;
+    clearSandbox();
+    setSource("");
+    setSourcePrompt("");
+    setPrompt("");
+    setAssets([]);
+    setCurrentId(null);
+    setName("Untitled");
+    setError(null);
+    setSaveNotice(null);
+    setStreamed("");
+    setTab("preview");
+  }, [busy, clearSandbox]);
+
   return (
     <div className="studio">
       <header className="studio-bar">
@@ -625,9 +720,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           className={hasKey ? "ghost" : "primary"}
           onClick={() => setShowSettings(true)}
         >
-          {hasKey
-            ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} · ${credentials.model}`
-            : "Add API key"}
+          {credentials.provider === "hosted"
+            ? hostedAvailable === null ? "Checking Included AI" : hostedAvailable ? "Included AI" : "AI setup needed"
+            : hasKey ? `${PROVIDERS.find((p) => p.id === credentials.provider)?.label} · ${credentials.model}` : "Add API key"}
         </button>
       </header>
 
@@ -652,7 +747,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                   ? "Make the title land harder and hold two seconds longer."
                   : "A 10-second vertical card where..."
               }
-              onChange={(event) => setPrompt(event.target.value)}
+              onChange={(event) => { setPrompt(event.target.value); setSaveNotice(null); }}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                   event.preventDefault();
@@ -671,8 +766,12 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             >
               {busy === "refining" ? "Refining brief…" : "✦ Refine prompt"}
             </button>
-            <small>{hasKey ? "Uses your selected model; provider charges may apply. This won’t create a video." : "Add your API key to refine with AI."}</small>
+            <small>{credentials.provider === "hosted" ? "Uses Included AI. This improves the brief before generating." : hasKey ? "Uses your selected model; provider charges may apply. This won’t create a video." : "Add your API key to refine with AI."}</small>
           </div>
+
+          {credentials.provider === "hosted" && hostedAvailable === false ? (
+            <p className="axis-warn">Included AI is not configured on this deployment. The site owner can add its server key, or you can choose your own provider above.</p>
+          ) : null}
 
           {/*
             Brand and Direction are the two axes the whole tool turns on: the
@@ -777,27 +876,33 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
                 {source ? "Apply change" : "Generate"}
               </button>
             )}
-            {source && !busy ? (
+            {(source || prompt || assets.length > 0) && !busy ? (
               <button
                 type="button"
                 className="ghost"
-                onClick={() => {
-                  setSource("");
-                  setCurrentId(null);
-                  setName("Untitled");
-                  setError(null);
-                }}
+                onClick={resetDesign}
               >
-                New
+                Reset design
               </button>
             ) : null}
           </div>
+
+          {source && config && !busy ? (
+            <div className="prompt-tools">
+              <button type="button" className="ghost" disabled={!hasKey} onClick={() => void polishVisuals()}>
+                ✦ Review & improve visuals
+              </button>
+              <small>Reviews six rendered frames with {credentials.provider === "hosted" ? "Included AI" : "your model; provider charges may apply"}.</small>
+            </div>
+          ) : null}
+
+          {saveNotice ? <p className="status" role="status">{saveNotice}</p> : null}
 
           {busy ? (
             <p className="status" aria-live="polite">
               {busy === "repairing"
                 ? "That did not compile â€” asking for a fix"
-                : busy === "refining" ? "Clarifying your brief" : "Writing"}
+                : busy === "refining" ? "Clarifying your brief" : busy === "polishing" ? "Reviewing rendered frames and revising" : "Writing"}
               {busy !== "refining" ? <span className="counter">{streamed.length} chars</span> : null}
             </p>
           ) : null}

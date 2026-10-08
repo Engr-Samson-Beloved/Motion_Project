@@ -91,8 +91,20 @@ export const listCompositions = async (): Promise<SavedComposition[]> => {
   return [...all].sort((a, b) => b.updatedAt - a.updatedAt);
 };
 
-export const saveComposition = async (composition: SavedComposition) => {
-  await withStore("readwrite", (store) => store.put(composition), undefined);
+export const saveComposition = async (composition: SavedComposition): Promise<boolean> => {
+  const db = await openDatabase();
+  if (!db) return false;
+  return new Promise<boolean>((resolve) => {
+    try {
+      const transaction = db.transaction(STORE, "readwrite");
+      transaction.oncomplete = () => resolve(true);
+      transaction.onabort = () => resolve(false);
+      transaction.onerror = () => resolve(false);
+      transaction.objectStore(STORE).put(composition);
+    } catch {
+      resolve(false);
+    }
+  });
 };
 
 export const deleteComposition = async (id: string) => {

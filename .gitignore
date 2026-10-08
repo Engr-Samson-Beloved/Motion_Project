@@ -2,6 +2,10 @@ node_modules
 dist
 .DS_Store
 .env
+.env.local
+.vercel
+AI.txt
+AI.txt.txt
 
 # Ignore the output video from Git but not videos you import into src/.
 out
@@ -20,3 +24,5 @@ refs/*
 # The reason they were ignored has not stopped being true: they are large, they
 # go stale quickly, and a capture of a signed-in session can carry real user
 # data. Look at a new capture before adding it.
+.env*
+!.env.example

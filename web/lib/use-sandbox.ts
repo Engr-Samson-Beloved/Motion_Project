@@ -225,5 +225,10 @@ export const useSandbox = (frame: RefObject<HTMLIFrameElement | null>) => {
     setState((s) => ({ ...s, progress: null }));
   }, [post]);
 
-  return { state, load, render, stills, cancelRender };
+  const clear = useCallback(() => {
+    post({ type: "clear" });
+    setState((s) => ({ ...s, config: null, error: null, support: null, progress: null }));
+  }, [post]);
+
+  return { state, load, render, stills, cancelRender, clear };
 };

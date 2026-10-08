@@ -18,6 +18,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 export type ProviderId =
+  | "hosted"
   | "google"
   | "groq"
   | "anthropic"
@@ -42,6 +43,13 @@ export type Provider = {
  * this that stays true.
  */
 export const PROVIDERS: readonly Provider[] = [
+  {
+    id: "hosted",
+    label: "Included AI",
+    defaultModel: "openai/gpt-4o",
+    keyHint: "Ready to use. No personal API key needed.",
+    needsBaseUrl: false,
+  },
   {
     id: "google",
     label: "Google Gemini",
@@ -204,10 +212,29 @@ const generateOpenAiShaped = async (
     throw await httpError(response, label);
   }
 
-  const reader = response.body.getReader();
+  return readOpenAiStream(response.body, onToken);
+};
+
+const readOpenAiStream = async (body: ReadableStream<Uint8Array>, onToken?: (chunk: string) => void) => {
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let text = "";
+  let finishReason: string | null = null;
+
+  const consume = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+    let parsed: { error?: { message?: string }; choices?: { delta?: { content?: string }; finish_reason?: string | null }[] };
+    try { parsed = JSON.parse(payload) as typeof parsed; } catch { return; }
+    if (parsed.error) throw new Error(parsed.error.message || "The model returned an error.");
+    const choice = parsed.choices?.[0];
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
+    const chunk = choice?.delta?.content;
+    if (chunk) { text += chunk; onToken?.(chunk); }
+  };
 
   for (;;) {
     const { done, value } = await reader.read();
@@ -218,31 +245,25 @@ const generateOpenAiShaped = async (
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) {
-        continue;
-      }
-      const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") {
-        continue;
-      }
-      try {
-        const parsed = JSON.parse(payload) as {
-          choices?: { delta?: { content?: string } }[];
-        };
-        const chunk = parsed.choices?.[0]?.delta?.content;
-        if (chunk) {
-          text += chunk;
-          onToken?.(chunk);
-        }
-      } catch {
-        // A malformed or non-JSON keepalive line is not worth failing over.
-      }
-    }
+    for (const line of lines) consume(line);
   }
-
+  if (buffer.trim()) consume(buffer);
+  if (finishReason && finishReason !== "stop") {
+    throw new Error(finishReason === "length" ? "The model reached its output limit. Try a shorter video or simpler prompt." : `The model stopped early (${finishReason}). Try again.`);
+  }
+  if (!text.trim()) throw new Error("The model returned no text. Try another model or prompt.");
   return text;
+};
+
+const generateHosted = async ({system, prompt, images = [], maxTokens = MAX_TOKENS, signal, onToken}: GenerateOptions) => {
+  const response = await fetch("/api/ai", {
+    method: "POST",
+    signal,
+    headers: {"content-type": "application/json"},
+    body: JSON.stringify({system, prompt, images, maxTokens}),
+  });
+  if (!response.ok || !response.body) throw await httpError(response, "Included AI");
+  return readOpenAiStream(response.body, onToken);
 };
 
 /** Gemini's generateContent, non-streaming — its stream format differs enough
@@ -295,14 +316,16 @@ export const generateComposition = async (
 ): Promise<string> => {
   const { credentials } = options;
 
-  if (!credentials.apiKey.trim()) {
+  if (credentials.provider !== "hosted" && !credentials.apiKey.trim()) {
     throw new Error("Add an API key first.");
   }
-  if (!credentials.model.trim()) {
+  if (credentials.provider !== "hosted" && !credentials.model.trim()) {
     throw new Error("Name a model first.");
   }
 
   switch (credentials.provider) {
+    case "hosted":
+      return generateHosted(options);
     case "anthropic":
       return generateAnthropic(options);
     case "openai":
@@ -366,6 +389,7 @@ const listOpenAiShaped = async (
 export const listModels = async (
   credentials: Credentials,
 ): Promise<string[]> => {
+  if (credentials.provider === "hosted") return [credentials.model || "openai/gpt-4o"];
   if (!credentials.apiKey.trim()) {
     throw new Error("Add an API key first.");
   }

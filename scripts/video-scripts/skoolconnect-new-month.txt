@@ -1,0 +1,22 @@
+SKOOLCONNECTNG — NEW MONTH
+Composition: NewMonth | 16 seconds | Social video
+Format: on-screen copy, no voice-over. Copy varies with the month; verify
+src/skng/month/script.ts before publishing a dated version.
+
+00:00–00:04  The date turns; the new month rolls into place.
+00:04–00:09  [Month-specific headline]
+00:09–00:13  [Month-specific supporting line]
+00:13–00:16  SkoolConnectNG
+Visual: calendar grid assembles, copy lands, then the brand mark.
+
+Default copy:
+NEW MONTH
+A fresh page, same campus.
+Everything your school is doing, in one place.
+
+September: RESUMPTION SEASON / New session, new faces. / Find your people
+before you find your seat.
+January: NEW YEAR, NEW SEMESTER / Back to it, better this time. / Every
+result, event and update, in one place.
+June: EXAM SEASON / Heads down, then home. / Keep up with your campus while
+you revise.

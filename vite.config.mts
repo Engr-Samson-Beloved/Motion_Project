@@ -1,4 +1,5 @@
-import { defineConfig, type Connect, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Connect, type Plugin } from "vite";
+import { handleAi } from "./api/ai.ts";
 
 /**
  * Lets the sandbox load its own code.
@@ -33,6 +34,16 @@ const allowSandboxToFetchItsOwnCode = (): Plugin => {
   };
 };
 
+const hostedAiDevProxy = (key: string | undefined): Plugin => ({
+  name: "hosted-ai-dev-proxy",
+  configureServer(server) {
+    server.middlewares.use("/api/ai", (req, res) => { void handleAi(req, res, key); });
+  },
+  configurePreviewServer(server) {
+    server.middlewares.use("/api/ai", (req, res) => { void handleAi(req, res, key); });
+  },
+});
+
 /**
  * The gallery app.
  *
@@ -56,10 +67,12 @@ const allowSandboxToFetchItsOwnCode = (): Plugin => {
  * set, `staticFile("bed90.mp3")` returns `/bed90.mp3`, and that is exactly
  * where Vite serves it. The compositions therefore need no changes to run here.
  */
-export default defineConfig({
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), "OPENROUTER_");
+  return {
   root: "web",
   publicDir: "../public",
-  plugins: [allowSandboxToFetchItsOwnCode()],
+  plugins: [hostedAiDevProxy(env.OPENROUTER_API_KEY), allowSandboxToFetchItsOwnCode()],
   build: {
     outDir: "../dist",
     emptyOutDir: true,
@@ -81,4 +94,5 @@ export default defineConfig({
     // The app imports compositions from `src/`, which is outside `root`.
     fs: { allow: [".."] },
   },
+  };
 });

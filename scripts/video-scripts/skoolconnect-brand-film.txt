@@ -1,0 +1,23 @@
+SKOOLCONNECTNG — BRAND FILM
+Composition: SkoolConnectFilm | 60 seconds | Landscape 16:9
+Format: cinematic visual narrative with on-screen copy; no narration script is
+defined in the composition source.
+
+OPEN — Introduce SkoolConnectNG as a unified digital network for Nigeria's
+student ecosystem.
+
+THE PROBLEM — Fragmented Identity / Unreliable Information / Lost Community.
+Show how student identity, useful information, and community become split
+across disconnected places.
+
+THE SOLUTION — Bring the student journey together in one connected network.
+
+THE DIFFERENCE — Show how verified identity, relevant information, and lasting
+connection support a more confident student journey.
+
+THE PILLARS — Connect. Discover. Grow. Reveal the core pillars as one system.
+
+CLOSE — SkoolConnectNG / skoolconnect.ng
+
+The source composition cross-dissolves between six scenes. Inspect
+src/skng/scenes.tsx for the exact on-screen copy.

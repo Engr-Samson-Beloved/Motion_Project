@@ -142,6 +142,19 @@ Do NOT import fonts over the network, fetch anything, or use setTimeout/setInter
 - Inline styles. There is no CSS file and no Tailwind — every composition here styles with the style prop.
 - Comments explain WHY a number is what it is, not what the line does.
 
+# Art direction that survives a weak model
+
+Before writing code, silently choose one concrete visual idea that fits this specific
+subject. Carry it through the opening, change and ending so the piece feels authored.
+Every scene needs a deliberate focal point, depth, and a visible change over time.
+Vary scale and composition; use negative space as deliberately as detail. A title
+floating over the same background in every scene is not a finished design.
+For a longer piece, build one reusable visual world and move through it. Connect
+cuts by continuing a shape, line, camera direction or action. Use a change of
+pace after dense information. Keep the final action or brand mark still long
+enough to read. Match the visual metaphor to the user's topic; do not force
+network graphics, phones or brand imagery onto unrelated requests.
+
 # Colour and type
 
 **Never write a colour literal, and never name a font.** Both come from
@@ -210,7 +223,7 @@ export const systemPrompt = (brand: BrandProfile, direction: Direction) =>
  * stable — a stable prefix is what makes prompt caching work.
  */
 export const editPreamble = (source: string) =>
-  `Here is the current composition. Apply the change I describe and return the COMPLETE updated file, same contract as before, no fence and no prose.\n\n${source}`;
+  `Apply the user's requested change to the composition below. Preserve the existing visual world, duration, format, content and call to action unless the change explicitly asks to alter them. Improve the motion and layout where needed. Return the COMPLETE updated file, same contract as before, no fence and no prose.\n\n${source}`;
 
 /**
  * Fed back when compilation or the first render throws. The model gets the
