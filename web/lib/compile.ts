@@ -31,6 +31,7 @@ import { brandModule, type BrandProfile } from "./brand";
 import { directionModule, type Direction } from "./direction";
 import { isDark } from "./brand";
 import { makeStageModule } from "./stage";
+import { makeStoryModule } from "./story";
 import type {AssetMap} from "./assets";
 
 /**
@@ -83,6 +84,7 @@ export const modulesFor = (
   "@/brand": brandModule(brand, assets),
   "@/direction": directionModule(direction, isDark(brand)),
   "@/stage": makeStageModule(brand, direction),
+  "@/story": makeStoryModule(brand, direction, assets),
 });
 
 export const AVAILABLE_MODULES = [
@@ -90,6 +92,7 @@ export const AVAILABLE_MODULES = [
   "@/brand",
   "@/direction",
   "@/stage",
+  "@/story",
 ];
 
 export type CompositionConfig = {
@@ -108,13 +111,6 @@ export type CompileResult =
   | { ok: true; value: CompiledComposition }
   | { ok: false; stage: "transform" | "evaluate" | "contract"; message: string };
 
-const DEFAULT_CONFIG: CompositionConfig = {
-  width: 1080,
-  height: 1920,
-  fps: 30,
-  durationInFrames: 300,
-};
-
 const asMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
@@ -125,22 +121,23 @@ const asMessage = (error: unknown) =>
  */
 const readConfig = (raw: unknown): CompositionConfig => {
   if (typeof raw !== "object" || raw === null) {
-    return DEFAULT_CONFIG;
+    throw new Error("Export a config with width, height, fps, and durationInFrames.");
   }
   const source = raw as Partial<Record<keyof CompositionConfig, unknown>>;
   const pick = (key: keyof CompositionConfig) => {
     const value = source[key];
-    return typeof value === "number" && Number.isFinite(value) && value > 0
-      ? Math.round(value)
-      : DEFAULT_CONFIG[key];
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) throw new Error(`config.${key} must be a positive integer.`);
+    return value;
   };
-  const even = (n: number) => (n % 2 === 0 ? n : n + 1);
-  return {
-    width: even(pick("width")),
-    height: even(pick("height")),
+  const config = {
+    width: pick("width"),
+    height: pick("height"),
     fps: pick("fps"),
     durationInFrames: pick("durationInFrames"),
   };
+  if (config.width % 2 || config.height % 2) throw new Error("Config dimensions must be even for MP4 export.");
+  if (config.width > 4096 || config.height > 4096 || config.durationInFrames > 18000) throw new Error("Config exceeds the browser renderer limits.");
+  return config;
 };
 
 /**
@@ -206,11 +203,13 @@ export const compileComposition = (
     };
   }
 
+  let config: CompositionConfig;
+  try { config = readConfig(exported.config); } catch (error) { return {ok:false,stage:"contract",message:asMessage(error)}; }
   return {
     ok: true,
     value: {
       component: component as React.FC<Record<string, unknown>>,
-      config: readConfig(exported.config),
+      config,
     },
   };
 };

@@ -1,0 +1,34 @@
+{
+  "title": "Launch",
+  "thesis": "One signal becomes a network",
+  "format": "vertical",
+  "scenes": [
+    {
+      "id": "hook",
+      "kind": "type",
+      "motion": "rise",
+      "beats": 4,
+      "kicker": "The problem",
+      "headline": "The right people feel far away.",
+      "detail": "A useful way forward starts with one connection."
+    },
+    {
+      "id": "signal",
+      "kind": "signal",
+      "motion": "wipe",
+      "beats": 6,
+      "kicker": "The shift",
+      "headline": "A signal becomes a network.",
+      "detail": "Each connection makes the next easier."
+    },
+    {
+      "id": "action",
+      "kind": "orbit",
+      "motion": "scale",
+      "beats": 6,
+      "kicker": "Now",
+      "headline": "Find your next connection.",
+      "detail": "Start today."
+    }
+  ]
+}

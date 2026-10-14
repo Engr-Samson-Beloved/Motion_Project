@@ -6,6 +6,7 @@ import { productionBrief } from "./lib/brief";
 import { editPreamble, repairPreamble, systemPrompt } from "./lib/skill";
 import {
   BUILT_IN_BRANDS,
+  NEUTRAL,
   SKNG_DARK,
   checkBrand,
   loadCustomBrands,
@@ -35,6 +36,7 @@ import {
 import { scaleFor, type RenderQuality } from "./lib/render";
 import { sampleFrames } from "./lib/stills";
 import { REMOTION_LICENSE_KEY } from "./lib/license";
+import {fitPlanToBeats, parseMotionPlan, planPrompt, planSystemPrompt, requestedBeats, sourceFromPlan, type MotionPlan, type MotionScene} from "./lib/plan";
 
 const DEFAULT_CREDENTIALS: Credentials = {
   provider: "hosted",
@@ -246,6 +248,8 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const [prompt, setPrompt] = useState("");
   const [sourcePrompt, setSourcePrompt] = useState("");
   const [source, setSource] = useState("");
+  const [plan, setPlan] = useState<MotionPlan | null>(null);
+  const [authoringMode, setAuthoringMode] = useState<"planned" | "code">("planned");
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   const [busy, setBusy] = useState<null | "generating" | "repairing" | "refining" | "polishing">(null);
@@ -261,7 +265,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const [customBrands, setCustomBrands] = useState<BrandProfile[]>(loadCustomBrands);
   const brands = useMemo(() => [...BUILT_IN_BRANDS, ...customBrands], [customBrands]);
-  const [brand, setBrand] = useState<BrandProfile>(() => loadCustomBrands()[0] ?? SKNG_DARK);
+  const [brand, setBrand] = useState<BrandProfile>(() => loadCustomBrands()[0] ?? NEUTRAL);
   const [assets, setAssets] = useState<UserAsset[]>([]);
   const assetsByName = useMemo(() => assetMap(assets), [assets]);
   const [direction, setDirection] = useState<Direction>(() =>
@@ -271,6 +275,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   const [quality, setQuality] = useState<RenderQuality>("draft");
 
   const generateAbort = useRef<AbortController | null>(null);
+  const alreadyLoaded = useRef<{source:string;brand:BrandProfile;direction:Direction;assets:typeof assetsByName}|null>(null);
 
   /**
    * Everything to do with running the composition happens in the sandbox
@@ -346,9 +351,23 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
    */
   useEffect(() => {
     if (source) {
+      const loaded = alreadyLoaded.current;
+      if (loaded?.source === source && loaded.brand === brand && loaded.direction === direction && loaded.assets === assetsByName) {
+        alreadyLoaded.current = null;
+        return;
+      }
       void loadSandbox(source, brand, direction, assetsByName);
     }
   }, [assetsByName, brand, direction, loadSandbox, source]);
+
+  // The renderer reads tempo from the direction; keep the exported config in
+  // sync when someone changes it after planning.
+  useEffect(() => {
+    if (plan) {
+      const next = sourceFromPlan(plan, direction.beat);
+      setSource((current) => current === next ? current : next);
+    }
+  }, [direction.beat, plan]);
 
   const updateBrand = useCallback((patch: Partial<BrandProfile>) => {
     const next = {...brand, ...patch};
@@ -359,7 +378,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
   }, [brand]);
 
   const createBrand = useCallback(() => {
-    const next: BrandProfile = {...SKNG_DARK,id:`custom-${newId()}`,name:"My brand",forbid:[...SKNG_DARK.forbid]};
+    const next: BrandProfile = {...NEUTRAL,id:`custom-${newId()}`,name:"My brand",forbid:[...NEUTRAL.forbid]};
     setCustomBrands((prior)=>[...prior,next]);setBrand(next);
   }, []);
 
@@ -390,6 +409,32 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
       try {
         const imageReferences = await Promise.all(assets.map(prepareImageReference));
+        if (authoringMode === "planned") {
+          const response = await generateComposition({
+            credentials,
+            system: planSystemPrompt,
+            prompt: planPrompt(userPrompt, direction.bpm, assets.map((asset) => asset.name), mode === "edit" ? plan ?? undefined : undefined),
+            images: imageReferences,
+            maxTokens: 3500,
+            signal: controller.signal,
+            onToken: (chunk) => setStreamed((prior) => prior + chunk),
+          });
+          const nextPlan = fitPlanToBeats(parseMotionPlan(response, assets.map((asset) => asset.name)), requestedBeats(userPrompt, direction.bpm));
+          const nextSource = sourceFromPlan(nextPlan, direction.beat);
+          const result = await loadSandbox(nextSource, brand, direction, assetsByName);
+          if (!result.ok) throw new Error(`${result.stage}: ${result.message}`);
+          alreadyLoaded.current = {source:nextSource,brand,direction,assets:assetsByName};
+          setPlan(nextPlan);
+          setSource(nextSource);
+          setTab("preview");
+          if (mode === "create") {
+            setName(nextPlan.title);
+            setCurrentId(null);
+            setSourcePrompt(userPrompt);
+          }
+          setPrompt("");
+          return;
+        }
         const assetGuidance = assets.length
           ? `\n\nLocal image assets: ${assets.map((asset) => `${asset.name} (${asset.type})`).join(", ")}. Import {ASSETS, LOGO_SRC} from "@/brand". Use the exact provided filename in <Img src={ASSETS["filename.png"]}/>; use LOGO_SRC for the selected brand logo. Do not embed image data in the source.`
           : "";
@@ -405,7 +450,6 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
           onToken: (chunk) => setStreamed((prior) => prior + chunk),
         });
 
-        setSource(first);
         let result = await loadSandbox(first, brand, direction, assetsByName);
 
         // One automatic repair. The model sees its own output and the error,
@@ -422,11 +466,15 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             signal: controller.signal,
             onToken: (chunk) => setStreamed((prior) => prior + chunk),
           });
-          setSource(fixed);
           result = await loadSandbox(fixed, brand, direction, assetsByName);
+          if (result.ok) {alreadyLoaded.current={source:fixed,brand,direction,assets:assetsByName};setSource(fixed);}
+        } else {
+          alreadyLoaded.current={source:first,brand,direction,assets:assetsByName};
+          setSource(first);
         }
 
         if (result.ok) {
+          setPlan(null);
           setTab("preview");
           if (mode === "create") {
             setName(userPrompt.slice(0, 48) || "Untitled");
@@ -449,7 +497,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
         generateAbort.current = null;
       }
     },
-    [assets, assetsByName, brand, credentials, direction, loadSandbox, source],
+    [assets, assetsByName, authoringMode, brand, credentials, direction, loadSandbox, plan, source],
   );
 
   const refinePrompt = useCallback(async () => {
@@ -591,6 +639,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
       id: currentId ?? newId(),
       name: name.trim() || "Untitled",
       source,
+      plan,
       prompt: sourcePrompt,
       assets,
       brand,
@@ -606,7 +655,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     setCurrentId(record.id);
     setSaved(await listCompositions());
     setSaveNotice("Saved in this browser");
-  }, [assets, brand, currentId, direction, name, sourcePrompt, saved, source]);
+  }, [assets, brand, currentId, direction, name, plan, sourcePrompt, saved, source]);
 
   const onExportSource = useCallback(() => {
     downloadBlob(
@@ -615,12 +664,32 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     );
   }, [name, source]);
 
+  const onExportPlan = useCallback(() => {
+    if (!plan) return;
+    downloadBlob(new Blob([JSON.stringify(plan, null, 2)], {type:"application/json;charset=utf-8"}), `${slugify(name)}-plan.json`);
+  }, [name, plan]);
+
+  const onImportPlan = useCallback(async (file?: File) => {
+    if (!file) return;
+    try {
+      const imported = parseMotionPlan(await file.text(), assets.map((asset) => asset.name));
+      setPlan(imported);
+      setSource(sourceFromPlan(imported, direction.beat));
+      setAuthoringMode("planned");
+      setName(imported.title);
+      setCurrentId(null);
+      setError(null);
+      setTab("preview");
+    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+  }, [assets, direction.beat]);
+
   const onExportVideo = useCallback(async () => {
     if (!config) {
       return;
     }
     setError(null);
     try {
+      if (plan) parseMotionPlan(JSON.stringify(plan), assets.map((asset) => asset.name));
       const blob = await renderSandbox(scaleFor(quality));
       downloadBlob(
         blob,
@@ -629,12 +698,14 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     } catch (thrown) {
       setError(thrown instanceof Error ? thrown.message : String(thrown));
     }
-  }, [config, name, quality, renderSandbox]);
+  }, [assets, config, name, plan, quality, renderSandbox]);
 
   const openSaved = useCallback((record: SavedComposition) => {
     setCurrentId(record.id);
     setName(record.name);
     setSource(record.source);
+    setPlan(record.plan ?? null);
+    setAuthoringMode(record.plan ? "planned" : "code");
     setSourcePrompt(record.prompt);
     setPrompt("");
     setAssets(record.assets ?? []);
@@ -682,6 +753,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     if (busy) return;
     clearSandbox();
     setSource("");
+    setPlan(null);
     setSourcePrompt("");
     setPrompt("");
     setAssets([]);
@@ -692,6 +764,14 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
     setStreamed("");
     setTab("preview");
   }, [busy, clearSandbox]);
+
+  const updateScene = useCallback((index: number, patch: Partial<MotionScene>) => {
+    if (!plan) return;
+    const next = {...plan, scenes:plan.scenes.map((scene, i) => i === index ? {...scene, ...patch} : scene)};
+    setPlan(next);
+    setSource(sourceFromPlan(next, direction.beat));
+    setSaveNotice(null);
+  }, [plan, direction.beat]);
 
   return (
     <div className="studio">
@@ -736,6 +816,11 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
 
       <div className="studio-body">
         <aside className="composer">
+          <div className="authoring-switch" role="group" aria-label="Authoring mode">
+            <button type="button" className={authoringMode === "planned" ? "on" : ""} onClick={() => setAuthoringMode("planned")}>Directed scenes</button>
+            <button type="button" className={authoringMode === "code" ? "on" : ""} onClick={() => setAuthoringMode("code")}>Advanced code</button>
+          </div>
+          <label className="ghost file-button">Import scene plan<input type="file" accept="application/json,.json" onChange={(event)=>{void onImportPlan(event.target.files?.[0]);event.currentTarget.value="";}}/></label>
           <label className="field">
             <span>{source ? "Describe a change" : "Describe the piece"}</span>
             <textarea
@@ -825,7 +910,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
             <label className="field"><span>Display typeface</span><select value={brand.headingFont} onChange={(event)=>updateBrand({headingFont:event.target.value})}>{CUSTOM_FONT_OPTIONS.map((font)=><option key={font} value={font}>{font.split(",")[0].replace(/"/g,"")}</option>)}</select></label>
             <label className="field"><span>Voice</span><select value={brand.voice} onChange={(event)=>updateBrand({voice:event.target.value as BrandProfile["voice"]})}><option value="sentence">Sentence case</option><option value="caps">Uppercase display</option></select></label>
-            {brand.id.startsWith("custom-")&&<button type="button" className="ghost danger" onClick={()=>{setCustomBrands((prior)=>prior.filter((item)=>item.id!==brand.id));setBrand(SKNG_DARK);}}>Delete this brand</button>}
+            {brand.id.startsWith("custom-")&&<button type="button" className="ghost danger" onClick={()=>{setCustomBrands((prior)=>prior.filter((item)=>item.id!==brand.id));setBrand(NEUTRAL);}}>Delete this brand</button>}
           </details>
 
           <details className="creative-starters">
@@ -887,7 +972,20 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
             ) : null}
           </div>
 
-          {source && config && !busy ? (
+          {plan && authoringMode === "planned" ? <section className="plan-editor" aria-label="Scene plan">
+            <div className="plan-heading"><strong>Scene plan</strong><span>{plan.thesis}</span></div>
+            {plan.scenes.map((scene, index) => <div className="plan-scene" key={scene.id}>
+              <div className="plan-scene-head"><strong>{String(index + 1).padStart(2,"0")} · {scene.id}</strong><span>{((scene.beats * direction.beat) / 30).toFixed(1)}s</span></div>
+              <input aria-label={`Scene ${index + 1} headline`} value={scene.headline} maxLength={80} onChange={(event) => updateScene(index,{headline:event.target.value})}/>
+              <input aria-label={`Scene ${index + 1} detail`} value={scene.detail} maxLength={130} onChange={(event) => updateScene(index,{detail:event.target.value})}/>
+              <div className="plan-scene-controls"><select aria-label={`Scene ${index + 1} visual`} value={scene.kind} onChange={(event) => updateScene(index,{kind:event.target.value as MotionScene["kind"],asset:event.target.value === "image" ? scene.asset ?? assets[0]?.name : scene.asset})}>
+                {(["type","orbit","signal","split",...(assets.length?["image"]:[])] as MotionScene["kind"][]).map((kind)=><option key={kind} value={kind}>{kind}</option>)}
+              </select><select aria-label={`Scene ${index + 1} motion`} value={scene.motion} onChange={(event) => updateScene(index,{motion:event.target.value as MotionScene["motion"]})}>{(["rise","wipe","scale","drift"] as const).map((motion)=><option key={motion}>{motion}</option>)}</select><label>Beats <input type="number" min={2} max={32} value={scene.beats} onChange={(event)=>updateScene(index,{beats:Math.max(2,Math.min(32,Number(event.target.value)||2))})}/></label></div>
+              {scene.kind === "image" && <select aria-label={`Scene ${index + 1} image`} value={scene.asset ?? ""} onChange={(event)=>updateScene(index,{asset:event.target.value})}>{assets.map((asset)=><option key={asset.name} value={asset.name}>{asset.name}</option>)}</select>}
+            </div>)}
+          </section> : null}
+
+          {source && config && !busy && authoringMode === "code" ? (
             <div className="prompt-tools">
               <button type="button" className="ghost" disabled={!hasKey} onClick={() => void polishVisuals()}>
                 ✦ Review & improve visuals
@@ -1061,7 +1159,7 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               className="source"
               spellCheck={false}
               value={busy && streamed ? streamed : source}
-              onChange={(event) => setSource(event.target.value)}
+              onChange={(event) => {setSource(event.target.value);setPlan(null);setAuthoringMode("code");}}
               placeholder="The generated composition appears here, and you can edit it."
             />
           ) : null}
@@ -1081,8 +1179,9 @@ export const Studio: FC<{ onBack: () => void }> = ({ onBack }) => {
               disabled={!source}
               onClick={onExportSource}
             >
-              Export .tsx
+              {plan ? "Export Studio .tsx" : "Export .tsx"}
             </button>
+            {plan && <button type="button" className="ghost" onClick={onExportPlan}>Export plan.json</button>}
 
             <div className="spacer" />
 

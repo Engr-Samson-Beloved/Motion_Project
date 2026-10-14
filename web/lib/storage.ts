@@ -16,6 +16,7 @@ export type SavedComposition = {
   id: string;
   name: string;
   source: string;
+  plan?: import("./plan").MotionPlan | null;
   /** The prompt that produced it, so a piece can be re-generated or explained. */
   prompt: string;
   /** Local image data used by the composition; remains in this browser. */

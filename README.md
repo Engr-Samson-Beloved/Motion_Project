@@ -1487,3 +1487,24 @@ A repeatable pipeline for short motion graphics: a library of composable, prop-d
 animated pieces, previewed in Studio and rendered to MP4. `WelcomeScreen` and
 `TextMotion` are the reference pattern — a typed props contract, timing constants
 declared at the top, and springs doing the motion.
+
+### Browser Studio architecture (October 2026)
+
+The default **Directed scenes** path asks AI for a validated JSON scene plan,
+then renders that plan through `web/lib/story.tsx`. The plan records a visual
+thesis, format, and 2–8 scenes with beats, copy, visual kind, motion, and an
+optional image. The scene editor changes these choices without asking AI to
+rewrite the implementation. `sourceFromPlan()` turns the plan into an exportable
+TSX file for the existing sandbox, preview, save, and MP4 flow. Brand and
+direction remain independent inputs.
+
+The plan JSON is the portable edit format. The generated Studio TSX imports
+`@/story`, so it runs in this browser sandbox and needs the same renderer module
+if moved into a separate Remotion project.
+
+`web/lib/plan.ts` owns the contract and rejects malformed or missing assets. To
+add a visual ingredient, extend `SceneKind`, the validator, and the renderer in
+`web/lib/story.tsx`. **Advanced code** remains for bespoke compositions that
+need a new visual system. The renderer currently supplies five visual kinds;
+review the scene plan and preview before publishing. The next quality step is
+a contact sheet and evaluated examples across distinct briefs and brands.

@@ -1032,6 +1032,18 @@ code {
 .asset-row img { width:44px; height:44px; object-fit:cover; border-radius:2px; background:var(--ground); }
 .asset-row > span { min-width:0; overflow:hidden; color:var(--muted); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
 .asset-row button { padding:6px 8px; font-size:11px; }
+.authoring-switch { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:3px; border:1px solid var(--line); border-radius:4px; background:var(--surface-2); }
+.authoring-switch button { border:0; border-radius:3px; padding:9px 6px; background:transparent; color:var(--muted); cursor:pointer; font-size:12px; }
+.authoring-switch button.on { background:var(--green); color:#fff; }
+.plan-editor { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.plan-heading { display:flex; flex-direction:column; gap:4px; padding:10px 12px; border-left:3px solid var(--green); background:var(--surface-2); }
+.plan-heading strong { font-family:var(--heading); font-size:14px; }
+.plan-heading span { color:var(--muted); font-size:12px; line-height:1.4; }
+.plan-scene { display:flex; flex-direction:column; gap:7px; padding:10px; border:1px solid var(--line); border-radius:4px; background:var(--surface); }
+.plan-scene-head { display:flex; justify-content:space-between; color:var(--muted); font-family:var(--mono); font-size:11px; }
+.plan-scene input, .plan-scene select { min-width:0; width:100%; box-sizing:border-box; border:1px solid var(--line-2); border-radius:3px; padding:7px 8px; background:var(--surface-2); color:var(--white); font-size:12px; }
+.plan-scene-controls { display:grid; grid-template-columns:1fr 1fr 70px; gap:5px; }
+.plan-scene-controls label { display:flex; flex-direction:column; gap:2px; color:var(--muted); font-size:10px; }
 @media (max-width: 939px) {
   .composer { border-right:0; border-bottom:1px solid var(--line); max-height:none; }
   .asset-row { grid-template-columns:40px minmax(0,1fr) auto; }

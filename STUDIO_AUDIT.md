@@ -2,6 +2,10 @@
 
 Date: 8 October 2026. Scope: the browser Studio in `web/`, its Remotion sandbox, provider adapters, saved designs, and browser export. This is a code and product audit, not a claim that every provider/model combination has been tested live.
 
+## Implementation update — 14 October 2026
+
+The default Studio path now generates a validated scene plan and renders it with a deterministic motion component (`web/lib/plan.ts`, `web/lib/story.tsx`). Users can edit scene copy, visual kind, motion, image, and beats without regenerating TSX. Advanced code remains available. New projects start with the neutral brand. The compiler rejects invalid config values instead of silently substituting defaults. This addresses the central architecture finding and part of the design floor; the remaining audit findings below are still open unless separately changed.
+
 ## Executive finding
 
 Studio currently produces **AI-written TSX**, not a planned video assembled from reliable design components. The path is prompt → one long code completion → compile → optional repair → preview → optional six-frame visual revision → browser MP4. Compiling proves that the file can run; it does not prove that the story, typography, motion, brand use, or exported film is good. That explains why a successful generation can still look generic.
